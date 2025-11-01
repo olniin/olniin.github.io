@@ -41,7 +41,7 @@ main {
     "a a d d"
     "e e f f"
     "g g f f";
-  grid-template-columns: repeat(4, 2fr);
+  grid-template-columns: 4fr 3fr 3fr 3fr;
   grid-template-rows: 3fr 3fr 1fr 1fr;
   gap: 5px;
   color: #000000;
