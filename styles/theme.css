@@ -1,0 +1,86 @@
+/* ISC Scope theme settings */
+
+:root {
+  /* set for default theme detection */
+  color-scheme: light dark;
+
+  /* color variables for ease of use */
+  --light-bg: #ffffff;
+  --light-color: #000000;
+  --light-header: red;
+
+  --dark-bg: #222222;
+  --dark-color: #fafafa;
+  --dark-header: blue;
+}
+
+.light {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+body {
+  background-color: light-dark(var(--light-bg), var(--dark-bg));
+  color: light-dark(var(--light-color), var(--dark-color));
+}
+
+header {
+  background-color: light-dark(var(--light-header), var(--dark-header));
+  text-align: center;
+  width: 80%;
+  margin: 0 auto;
+}
+
+main {
+  display: grid;
+  grid-template-areas: 
+    "a a b c"
+    "a a d d"
+    "e e f f"
+    "g g f f";
+  grid-template-columns: repeat(4, 2fr);
+  grid-template-rows: 3fr 3fr 1fr 1fr;
+  gap: 5px;
+  color: #000000;
+  width: 80%;
+  margin: 10px auto;
+}
+
+.display {
+  grid-area: a;
+  background-color: aqua;
+  aspect-ratio: 5/3;
+}
+
+.scopeData {
+  grid-area: e;
+  background-color: aqua;
+}
+
+.scopeSettings {
+  grid-area: g;
+  background-color: aqua;
+}
+
+.channel1 {
+  grid-area: b;
+  background-color: aqua;
+}
+
+.channel2 {
+  grid-area: c;
+  background-color: aqua;
+}
+
+.trigger {
+  grid-area: d;
+  background-color: aqua;
+}
+
+.generator {
+  grid-area: f;
+  background-color: aqua;
+}
