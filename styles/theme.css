@@ -7,11 +7,13 @@
   /* color variables for ease of use */
   --light-bg: #ffffff;
   --light-color: #000000;
-  --light-header: red;
+  --light-header-bg: #bbbbbb;
+  --light-main-bg: #cccccc;
 
   --dark-bg: #222222;
   --dark-color: #fafafa;
-  --dark-header: blue;
+  --dark-header-bg: #333333;
+  --dark-main-bg: #444444;
 }
 
 .light {
@@ -28,10 +30,10 @@ body {
 }
 
 header {
-  background-color: light-dark(var(--light-header), var(--dark-header));
+  background-color: light-dark(var(--light-header-bg), var(--dark-header-bg));
+  margin: 0 auto;
   text-align: center;
   width: 80%;
-  margin: 0 auto;
 }
 
 main {
@@ -44,43 +46,42 @@ main {
   grid-template-columns: 4fr 3fr 3fr 3fr;
   grid-template-rows: 3fr 3fr 1fr 1fr;
   gap: 5px;
-  color: #000000;
   width: 80%;
   margin: 10px auto;
 }
 
 .display {
   grid-area: a;
-  background-color: aqua;
+  background-color: light-dark(var(--light-main-bg), var(--dark-main-bg));
   aspect-ratio: 5/3;
 }
 
 .scopeData {
   grid-area: e;
-  background-color: aqua;
+  background-color: light-dark(var(--light-main-bg), var(--dark-main-bg));
 }
 
 .scopeSettings {
   grid-area: g;
-  background-color: aqua;
+  background-color: light-dark(var(--light-main-bg), var(--dark-main-bg));
 }
 
 .channel1 {
   grid-area: b;
-  background-color: aqua;
+  background-color: light-dark(var(--light-main-bg), var(--dark-main-bg));
 }
 
 .channel2 {
   grid-area: c;
-  background-color: aqua;
+  background-color: light-dark(var(--light-main-bg), var(--dark-main-bg));
 }
 
 .trigger {
   grid-area: d;
-  background-color: aqua;
+  background-color: light-dark(var(--light-main-bg), var(--dark-main-bg));
 }
 
 .generator {
   grid-area: f;
-  background-color: aqua;
+  background-color: light-dark(var(--light-main-bg), var(--dark-main-bg));
 }
