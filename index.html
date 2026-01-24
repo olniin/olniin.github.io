@@ -1,16 +1,457 @@
+
 <!DOCTYPE html>
-<html lang="en-US">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>Testing the Web Serial API</title>
-    <script type="module" async src="main.js"></script>
-    <script type="module" async src="/serial.js"></script>
-  </head>
-  <body>
-    <p id="terminal">
-      Terminal Area
-    </p>
-    <button>Connect</button>
-  </body>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Web Serial Terminal</title>
+<style>
+  :root {
+    --bg: #0f1220;
+    --panel: #151a2e;
+    --muted: #8b90a5;
+    --text: #e6e8ef;
+    --accent: #4da3ff;
+    --accent-2: #7cf7d4;
+    --danger: #ff6b6b;
+    --ok: #54d16e;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); font-family: Inter, Segoe UI, system-ui, -apple-system, Arial, sans-serif;
+  }
+  header {
+    padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    border-bottom: 1px solid #22263f; background: linear-gradient(180deg, #131836, #10142e);
+  }
+  h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+  .container { padding: 16px; display: grid; grid-template-columns: 320px 1fr; gap: 16px; }
+  @media (max-width: 900px) { .container { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel); border: 1px solid #1c2242; border-radius: 12px; padding: 14px;
+    box-shadow: 0 0 0 1px #10142e inset, 0 6px 18px rgba(0,0,0,0.25);
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  label { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: block; }
+  select, input[type="number"], input[type="text"] {
+    width: 100%; padding: 8px 10px; background: #0f1329; border: 1px solid #242a50; color: var(--text);
+    border-radius: 8px; font-size: 14px; outline: none;
+  }
+  select:focus, input:focus, button:focus { border-color: var(--accent); }
+  .btn {
+    appearance: none; border: 1px solid #2b325e; background: #141a38; color: var(--text);
+    padding: 8px 12px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 14px;
+  }
+  .btn:hover { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(77,163,255,.15); }
+  .btn.primary { background: linear-gradient(180deg, #1a66ff, #134bcc); border-color: #2d5bdc; }
+  .btn.danger { background: #26141a; border-color: #5e2b2b; color: #ffb3b3; }
+  .btn.ghost { background: transparent; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+  .terminal {
+    height: 56vh; min-height: 280px; background: #0a0d1a; border: 1px solid #1b2145;
+    border-radius: 10px; padding: 12px; overflow: auto; font-family: var(--mono);
+    white-space: pre-wrap; word-break: break-word; line-height: 1.35;
+  }
+  .status-bar {
+    display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 12px; margin-top: 8px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .dot.red    { background: var(--danger); }
+  .dot.green  { background: var(--ok); }
+  .kv { background: #0f142b; padding: 8px; border-radius: 8px; border: 1px solid #222958; }
+  .stretch { flex: 1; }
+  .send-row { display: flex; gap: 8px; }
+  .send-row input[type="text"] { flex: 1; }
+  .muted { color: var(--muted); }
+  .caps { text-transform: uppercase; letter-spacing: .6px; font-size: 11px; color: var(--muted); }
+  .pill { padding: 2px 8px; border-radius: 999px; border: 1px solid #2a2f59; background:#101538; color:#cdd3ff; }
+  code.small { font-family: var(--mono); font-size: 12px; color:#c0c6ff; }
+  .hint { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Web Serial Terminal</h1>
+    <div class="toolbar">
+      <button id="connectBtn" class="btn primary">Connect</button>
+      <button id="disconnectBtn" class="btn danger" disabled>Disconnect</button>
+      <button id="clearBtn" class="btn">Clear</button>
+      <button id="saveBtn" class="btn">Save Log</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- LEFT: Settings -->
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Baud</label>
+          <select id="baud">
+            <option>9600</option>
+            <option>19200</option>
+            <option>38400</option>
+            <option>57600</option>
+            <option selected>115200</option>
+            <option>230400</option>
+            <option>460800</option>
+            <option>921600</option>
+          </select>
+        </div>
+        <div>
+          <label>Flow Control</label>
+          <select id="flow">
+            <option value="none" selected>None</option>
+            <option value="hardware">RTS/CTS (hardware)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row-3" style="margin-top:8px">
+        <div>
+          <label>Data Bits</label>
+          <select id="dataBits">
+            <option>7</option>
+            <option selected>8</option>
+          </select>
+        </div>
+        <div>
+          <label>Parity</label>
+          <select id="parity">
+            <option value="none" selected>None</option>
+            <option value="even">Even</option>
+            <option value="odd">Odd</option>
+          </select>
+        </div>
+        <div>
+          <label>Stop Bits</label>
+          <select id="stopBits">
+            <option selected>1</option>
+            <option>2</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Line Ending (when sending)</label>
+        <select id="newline">
+          <option value="lf">LF (\n)</option>
+          <option value="crlf" selected>CRLF (\r\n)</option>
+          <option value="cr">CR (\r)</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+
+      <div style="margin-top:12px">
+        <label class="caps">Signals</label>
+        <div class="toolbar">
+          <button id="dtrBtn" class="btn">DTR: <span id="dtrState" class="pill">OFF</span></button>
+          <button id="rtsBtn" class="btn">RTS: <span id="rtsState" class="pill">OFF</span></button>
+          <span class="hint">CTS/DCD/RI will auto-update</span>
+        </div>
+        <div class="status-bar" id="signals">
+          <span><span class="dot" id="ctsDot"></span>CTS</span>
+          <span><span class="dot" id="dcdDot"></span>DCD</span>
+          <span><span class="dot" id="riDot"></span>RI</span>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label class="caps">Info</label>
+        <div class="kv" id="portInfo">Not connected</div>
+      </div>
+      <p class="hint" style="margin-top:10px">
+        Tip: Chrome/Edge require HTTPS or <code class="small">http://localhost</code>. You’ll get a chooser to select the serial device.
+      </p>
+    </div>
+
+    <!-- RIGHT: Terminal -->
+    <div class="card">
+      <div id="terminal" class="terminal" aria-live="polite"></div>
+      <div class="status-bar">
+        <span id="connStatus"><span class="dot red"></span>Disconnected</span>
+        <span class="stretch"></span>
+        <span id="counter" class="muted">RX: 0  |  TX: 0</span>
+      </div>
+
+      <div style="margin-top:12px" class="send-row">
+        <input id="sendInput" type="text" placeholder="Type text and press Enter to send…" autocomplete="off" />
+        <button id="sendBtn" class="btn">Send</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function() {
+  const terminal = document.getElementById('terminal');
+  const connectBtn = document.getElementById('connectBtn');
+  const disconnectBtn = document.getElementById('disconnectBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const sendBtn = document.getElementById('sendBtn');
+  const sendInput = document.getElementById('sendInput');
+
+  const baudSel = document.getElementById('baud');
+  const flowSel = document.getElementById('flow');
+  const dataBitsSel = document.getElementById('dataBits');
+  const paritySel = document.getElementById('parity');
+  const stopBitsSel = document.getElementById('stopBits');
+  const newlineSel = document.getElementById('newline');
+
+  const dtrBtn = document.getElementById('dtrBtn');
+  const rtsBtn = document.getElementById('rtsBtn');
+  const dtrState = document.getElementById('dtrState');
+  const rtsState = document.getElementById('rtsState');
+
+  const connStatus = document.getElementById('connStatus');
+  const portInfo = document.getElementById('portInfo');
+  const counter = document.getElementById('counter');
+
+  const ctsDot = document.getElementById('ctsDot');
+  const dcdDot = document.getElementById('dcdDot');
+  const riDot = document.getElementById('riDot');
+
+  let port = null;
+  let reader = null;
+  let writer = null;
+  let inputDone = null;
+  let outputDone = null;
+  let monitorTimer = null;
+
+  let dtr = false;
+  let rts = false;
+
+  let rxCount = 0;
+  let txCount = 0;
+
+  // Feature detection
+  if (!('serial' in navigator)) {
+    appendToTerminal("❌ Web Serial API not supported in this browser.\nUse Chrome/Edge on desktop over HTTPS or localhost.\n");
+    connectBtn.disabled = true;
+  }
+
+  function setConnUI(connected) {
+    connectBtn.disabled = connected;
+    disconnectBtn.disabled = !connected;
+    dtrBtn.disabled = !connected;
+    rtsBtn.disabled = !connected;
+    sendBtn.disabled = !connected;
+    sendInput.disabled = !connected;
+
+    connStatus.innerHTML = connected
+      ? '<span class="dot green"></span>Connected'
+      : '<span class="dot red"></span>Disconnected';
+  }
+
+  function setDot(dot, on) {
+    dot.className = 'dot ' + (on ? 'green' : 'red');
+  }
+
+  function clampTerminal() {
+    // Keep terminal text length under ~100k chars to avoid memory bloat
+    const maxChars = 100000;
+    if (terminal.textContent.length > maxChars) {
+      terminal.textContent = terminal.textContent.slice(-Math.floor(maxChars * 0.8));
+    }
+  }
+
+  function appendToTerminal(text) {
+    terminal.textContent += text;
+    terminal.scrollTop = terminal.scrollHeight;
+    clampTerminal();
+  }
+
+  function updateCounters() {
+    counter.textContent = `RX: ${rxCount}  |  TX: ${txCount}`;
+  }
+
+  function getLineEnding() {
+    switch (newlineSel.value) {
+      case 'lf': return '\n';
+      case 'cr': return '\r';
+      case 'crlf': return '\r\n';
+      default: return '';
+    }
+  }
+
+  async function openPort() {
+    try {
+      // Optional: provide USB vendor filters (e.g., Silicon Labs, FTDI, CH340, CP210x) to reduce the chooser clutter
+      const filters = []; // e.g., [{ usbVendorId: 0x10C4 }, { usbVendorId: 0x1A86 }, { usbVendorId: 0x0403 }]
+      port = await navigator.serial.requestPort({ filters });
+      await port.open({
+        baudRate: Number(baudSel.value),
+        dataBits: Number(dataBitsSel.value),
+        stopBits: Number(stopBitsSel.value),
+        parity: paritySel.value,
+        flowControl: flowSel.value // 'none' or 'hardware'
+      });
+
+      // Setup streams
+      const decoder = new TextDecoderStream();
+      inputDone = port.readable.pipeTo(decoder.writable);
+      const inputStream = decoder.readable;
+      reader = inputStream.getReader();
+
+      const encoder = new TextEncoderStream();
+      outputDone = encoder.readable.pipeTo(port.writable);
+      writer = encoder.writable.getWriter();
+
+      // Reset counters
+      rxCount = 0; txCount = 0; updateCounters();
+
+      // Show basic info
+      try {
+        const info = port.getInfo ? port.getInfo() : {};
+        const { usbVendorId, usbProductId } = info || {};
+        portInfo.innerHTML = `
+          <div><strong>Baud:</strong> ${baudSel.value}</div>
+          <div><strong>Config:</strong> ${dataBitsSel.value}${paritySel.value !== 'none' ? paritySel.value[0].toUpperCase() : 'N'}${stopBitsSel.value}</div>
+          <div><strong>Flow:</strong> ${flowSel.value}</div>
+          <div><strong>VID:PID:</strong> ${usbVendorId ? '0x' + usbVendorId.toString(16).padStart(4, '0') : '—'}:${usbProductId ? '0x' + usbProductId.toString(16).padStart(4, '0') : '—'}</div>
+        `;
+      } catch {
+        portInfo.textContent = `Baud ${baudSel.value} | ${dataBitsSel.value}${paritySel.value !== 'none' ? paritySel.value[0].toUpperCase() : 'N'}${stopBitsSel.value} | Flow ${flowSel.value}`;
+      }
+
+      setConnUI(true);
+      appendToTerminal("✅ Port opened.\n");
+
+      // Start monitoring modem signals periodically
+      monitorTimer = setInterval(async () => {
+        try {
+          if (!port || !port.getSignals) return;
+          const sig = await port.getSignals();
+          setDot(ctsDot, !!sig.clearToSend);
+          setDot(dcdDot, !!sig.dataCarrierDetect);
+          setDot(riDot,  !!sig.ringIndicator);
+        } catch { /* ignore */ }
+      }, 300);
+
+      // Read loop
+      (async () => {
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            if (value) {
+              rxCount += value.length;
+              appendToTerminal(value);
+              updateCounters();
+            }
+          }
+        } catch (err) {
+          appendToTerminal(`\n[Read error] ${err?.message || err}\n`);
+        }
+      })();
+
+    } catch (err) {
+      appendToTerminal(`❌ ${err?.message || err}\n`);
+      await closePort(); // ensure cleanup on partial failures
+    }
+  }
+
+  async function closePort() {
+    try {
+      if (monitorTimer) { clearInterval(monitorTimer); monitorTimer = null; }
+
+      // Cancel reader
+      try { if (reader) { await reader.cancel(); } } catch {}
+      try { if (inputDone) { await inputDone; } } catch {}
+      try { if (reader) { reader.releaseLock(); } } catch {}
+
+      // Close writer
+      try { if (writer) { await writer.close(); } } catch {}
+      try { if (outputDone) { await outputDone; } } catch {}
+
+      // Reset signals (optional)
+      try { if (port && port.setSignals) { await port.setSignals({ dataTerminalReady: false, requestToSend: false }); } } catch {}
+
+      // Close the port
+      try { if (port) { await port.close(); } } catch {}
+
+    } finally {
+      port = null; reader = null; writer = null;
+      setConnUI(false);
+      appendToTerminal("🔌 Port closed.\n");
+      dtr = false; rts = false;
+      dtrState.textContent = 'OFF'; rtsState.textContent = 'OFF';
+      setDot(ctsDot, false); setDot(dcdDot, false); setDot(riDot, false);
+    }
+  }
+
+  async function sendText(text) {
+    if (!writer) return;
+    const lineEnd = getLineEnding();
+    const payload = text + lineEnd;
+    try {
+      await writer.write(payload);
+      txCount += payload.length;
+      updateCounters();
+    } catch (err) {
+      appendToTerminal(`\n[Write error] ${err?.message || err}\n`);
+    }
+  }
+
+  async function toggleSignal(name) {
+    if (!port || !port.setSignals) return;
+    if (name === 'dtr') {
+      dtr = !dtr;
+      await port.setSignals({ dataTerminalReady: dtr });
+      dtrState.textContent = dtr ? 'ON' : 'OFF';
+    } else if (name === 'rts') {
+      rts = !rts;
+      await port.setSignals({ requestToSend: rts });
+      rtsState.textContent = rts ? 'ON' : 'OFF';
+    }
+  }
+
+  // UI events
+  connectBtn.addEventListener('click', openPort);
+  disconnectBtn.addEventListener('click', closePort);
+  clearBtn.addEventListener('click', () => { terminal.textContent = ''; });
+  saveBtn.addEventListener('click', () => {
+    const blob = new Blob([terminal.textContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    a.href = url;
+    a.download = `serial-log-${ts}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+  sendBtn.addEventListener('click', () => {
+    if (!sendInput.value) return;
+    sendText(sendInput.value);
+    sendInput.value = '';
+    sendInput.focus();
+  });
+  sendInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const v = sendInput.value;
+      if (v) sendText(v);
+      sendInput.value = '';
+    }
+  });
+
+  dtrBtn.addEventListener('click', () => toggleSignal('dtr'));
+  rtsBtn.addEventListener('click', () => toggleSignal('rts'));
+
+  // Auto-update connection indicator on OS-level (dis)connects
+  navigator.serial.addEventListener('connect', (event) => {
+    appendToTerminal('🔔 A serial device became available.\n');
+  });
+  navigator.serial.addEventListener('disconnect', async (event) => {
+    appendToTerminal('🔕 A serial device was unplugged.\n');
+    if (port && event.target === port) { await closePort(); }
+  });
+
+  // Initial UI
+  setConnUI(false);
+})();
+</script>
+</body>
 </html>
