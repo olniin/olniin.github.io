@@ -1,27 +1,26 @@
-document.querySelector("button").addEventListener("click", async () => {
-  // Prompt user to select a serial port
+export async function serialConnect() {
   const port = await navigator.serial.requestPort();
-});
 
-await port.open({baudRate: 115200});
+  await port.open({baudRate: 115200});
 
-while (port.readable) {
+  while (port.readable) {
 
-  const reader = port.readable.getReader();
+    const reader = port.readable.getReader();
 
-  try {
-    while (true) {
-      const {value, done} = await reader.read();
-      if (done) {
-        // allow port to be closed later
-        reader.releaseLock();
-        break;
+    try {
+      while (true) {
+        const {value, done} = await reader.read();
+        if (done) {
+          // allow port to be closed later
+          reader.releaseLock();
+          break;
+        }
+        if (value) {
+          console.log(value);
+        }
       }
-      if (value) {
-        console.log(value);
-      }
+    } catch (error) {
+      terminalElement.textContent(error);
     }
-  } catch (error) {
-    terminalElement.textContent(error);
   }
 }
