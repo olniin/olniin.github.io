@@ -1,3 +1,5 @@
+import "serial.js"
+
 const terminalElement = document.getElementById("terminal");
 
 if ("serial" in navigator) {
