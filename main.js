@@ -1,3 +1,4 @@
+// main
 import serialConnect from "serial.js"
 
 const terminalElement = document.getElementById("terminal");
