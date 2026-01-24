@@ -1,5 +1,5 @@
 // main
-import {serialConnect} from "./serial.js"
+import "./serial.js"
 
 const terminalElement = document.getElementById("terminal");
 
