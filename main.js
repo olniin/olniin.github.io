@@ -1,5 +1,4 @@
-// import serialConnect from "serial.js"
-const serialConnect = require("serial.js");
+import serialConnect from "serial.js"
 
 const terminalElement = document.getElementById("terminal");
 
