@@ -1,5 +1,5 @@
 // main
-import "./serial.js"
+import serialConnect from "./serial.js"
 
 const terminalElement = document.getElementById("terminal");
 
@@ -10,4 +10,4 @@ if ("serial" in navigator) {
   terminalElement.textContent = "No serial for you!! :(";
 }
 
-document.querySelector("button").addEventListener("click", serialConnect());
+document.querySelector("button").addEventListener("click", serialConnect);
