@@ -1,4 +1,4 @@
-export async function serialConnect() {
+export default async function serialConnect() {
   const port = await navigator.serial.requestPort();
 
   await port.open({baudRate: 115200});
