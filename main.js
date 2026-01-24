@@ -10,8 +10,9 @@ if ("serial" in navigator) {
 document.querySelector("button").addEventListener("click", async () => {
   // Prompt user to select a serial port
   const port = await navigator.serial.requestPort();
-  await port.open({baudRate: 115200});
 });
+
+await port.open({baudRate: 115200});
 
 while (port.readable) {
 
