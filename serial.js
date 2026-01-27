@@ -26,14 +26,14 @@ export async function serialConnect() {
           console.log(value); // should be a string now
           dataCounter = 0;
           dataHasBegun = 1;
-        } else if(value && dataHasBegun && dataCounter<1024) {
+        } else if (value && dataHasBegun && dataCounter<1024) {
           const parts = value.split(",");
           serialOutput.push(parseInt(parts[0], 16));
           serialOutput.push(parseInt(parts[1], 16));
           console.log(serialOutput);
           console.log(value);
           dataCounter+=1;
-        } else {
+        } else if (dataCounter>=1024) {
           dataHasBegun = 0;
           console.log("Data reset!");
         }
