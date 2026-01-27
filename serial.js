@@ -21,7 +21,7 @@ export async function serialConnect() {
           reader.releaseLock();
           break;
         }
-        if (value.startsWith("ISC")) {
+        if (value.includes("ISC")) {
           console.log("ISC detection correct");
           console.log(value); // should be a string now
           dataCounter = 0;
