@@ -41,7 +41,7 @@ export async function serialConnect() {
       }
     } catch (error) {
       // TODO: Handle non-fatal errors
-      console.log(error);
+      console.trace(error);
     }
   }
 }
