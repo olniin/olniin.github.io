@@ -8,7 +8,6 @@ export async function serialConnect() {
   await port.open({baudRate: 115200});
 
   while (port.readable) {
-    const reader = port.readable.getReader();
     try {
       while (true) {
         const {value, done} = await reader.read();
