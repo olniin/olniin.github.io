@@ -1,21 +1,23 @@
 export async function serialConnect() {
   const port = await navigator.serial.requestPort();
-  const bufferSize = 1024;  // 1 kB
-  let buffer = new ArrayBuffer(bufferSize);
-  await port.open({baudRate: 115200, bufferSize});
 
-  const reader = port.readable.getReader({mode: "byob"});
+  const textDecoder = new TextDecoderStream();
+  const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+  const reader = textDecoder.readable
+    .pipeThrough(new TransformStream(new LineBreakTransformer()))
+    .getReader();
+
+  await port.open({baudRate: 115200});
 
   while (port.readable) {
     try {
       while (true) {
-        const {value, done} = await reader.read(new Uint8Array(buffer));
+        const {value, done} = await reader.read();
         if (done) {
           // allow port to be closed later
           reader.releaseLock();
           break;
         }
-        buffer = value.buffer;
         if (value) {
           console.log(value); // should be a string now
         }
@@ -23,5 +25,26 @@ export async function serialConnect() {
     } catch (error) {
       // TODO: Handle non-fatal errors
     }
+  }
+}
+
+class LineBreakTransformer {
+  constructor() {
+    // A container for holding stream data until a new line.
+    this.chunks = "";
+  }
+
+  transform(chunk, controller) {
+    // Append new chunks to existing chunks.
+    this.chunks += chunk;
+    // For each line breaks in chunks, send the parsed lines out.
+    const lines = this.chunks.split("\r\n");
+    this.chunks = lines.pop();
+    lines.forEach((line) => controller.enqueue(line));
+  }
+
+  flush(controller) {
+    // When the stream is closed, flush any remaining chunks out.
+    controller.enqueue(this.chunks);
   }
 }
