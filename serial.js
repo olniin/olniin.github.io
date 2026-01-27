@@ -35,6 +35,7 @@ export async function serialConnect() {
           dataCounter+=1;
         } else if (dataCounter>=1024) {
           dataHasBegun = 0;
+          serialOutput.length = 0;
           console.log("Data reset!");
         }
       }
