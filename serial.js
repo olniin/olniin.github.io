@@ -1,11 +1,10 @@
 export async function serialConnect() {
   const port = await navigator.serial.requestPort();
+  await port.open({baudRate: 115200});
 
   const textDecoder = new TextDecoderStream();
   const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
   const reader = textDecoder.readable.getReader();
-
-  await port.open({baudRate: 115200});
 
   while (port.readable) {
     try {
