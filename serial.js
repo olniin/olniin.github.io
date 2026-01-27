@@ -20,14 +20,14 @@ export async function serialConnect() {
           break;
         }
         if (value=="ISC:") {
-          console.log(value); // should be a string now
           console.log("ISC detection correct");
+          console.log(value); // should be a string now
         } else if(value) {
-          console.log(value);
           const parts = value.split(",");
           serialOutput.push(parseInt(parts[0], 16));
           serialOutput.push(parseInt(parts[1], 16));
           console.log(serialOutput);
+          console.log(value);
         }
       }
     } catch (error) {
