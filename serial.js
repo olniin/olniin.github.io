@@ -10,6 +10,8 @@ export async function serialConnect() {
 
 
   const serialOutput = [];
+  const dataHasBegun = 0;
+  const dataCounter = 0;
   while (port.readable) {
     try {
       while (true) {
@@ -19,15 +21,22 @@ export async function serialConnect() {
           reader.releaseLock();
           break;
         }
-        if (value=="ISC:") {
+        if (value.startsWith("ISC")) {
           console.log("ISC detection correct");
           console.log(value); // should be a string now
-        } else if(value) {
+          dataCounter = 0;
+          dataHasBegun = 1;
+        } else if(value && dataHasBegun && dataCounter<1024) {
           const parts = value.split(",");
           serialOutput.push(parseInt(parts[0], 16));
           serialOutput.push(parseInt(parts[1], 16));
           console.log(serialOutput);
           console.log(value);
+          dataCounter+=1;
+        } else {
+          dataHasBegun = 0;
+          serialOutput = [];
+          console.log("Data reset!");
         }
       }
     } catch (error) {
