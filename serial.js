@@ -4,10 +4,7 @@ export async function serialConnect() {
   let buffer = new ArrayBuffer(bufferSize);
   await port.open({baudRate: 115200, bufferSize});
 
-  const textDecoder = new TextDecoderStream();
-  const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
-  const reader = textDecoder.readable.getReader({mode: "byob"});
-
+  const reader = port.readable.getReader({mode: "byob"});
 
   while (port.readable) {
     try {
