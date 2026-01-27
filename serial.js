@@ -9,7 +9,7 @@ export async function serialConnect() {
     .getReader();
 
 
-  const serialOutput = new Uint16Array(2048);
+  const serialOutput = [];
   while (port.readable) {
     try {
       while (true) {
@@ -32,7 +32,7 @@ export async function serialConnect() {
       }
     } catch (error) {
       // TODO: Handle non-fatal errors
-      console.error(error);
+      console.log(error);
     }
   }
 }
