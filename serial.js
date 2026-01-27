@@ -10,8 +10,8 @@ export async function serialConnect() {
 
 
   const serialOutput = [];
-  const dataHasBegun = 0;
-  const dataCounter = 0;
+  let dataHasBegun = 0;
+  let dataCounter = 0;
   while (port.readable) {
     try {
       while (true) {
