@@ -1,68 +1,107 @@
-export async function serialConnect() {
-  const port = await navigator.serial.requestPort();
-  await port.open({baudRate: 115200});
+// Minimal Web Serial line reader (Chrome/Edge).
+// - Secure context required (HTTPS or localhost)
+// - requestPort() must be called from a user gesture.
+//
+// Sources:
+//  - MDN Web Serial API & Serial.requestPort(): https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API
+//  - WICG spec: https://wicg.github.io/serial/
 
-  const textDecoder = new TextDecoderStream();
-  const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
-  const reader = textDecoder.readable
-    .pipeThrough(new TransformStream(new LineBreakTransformer()))
-    .getReader();
+export class SerialLineClient {
+  constructor() {
+    /** @type {SerialPort|null} */
+    this.port = null;
+    this.reader = null;
+    this.writer = null;
+    this.keepReading = false;
 
+    /** @type {(line: string)=>void} */
+    this.onLine = () => {};
+    /** @type {(s: string)=>void} */
+    this.onStatus = () => {};
+    /** @type {(e: any)=>void} */
+    this.onError = () => {};
+  }
 
-  const serialOutput = [];
-  let dataHasBegun = 0;
-  let dataCounter = 0;
-  while (port.readable) {
+  supported() {
+    return !!navigator.serial;
+  }
+
+  async connect({ baudRate = 115200 } = {}) {
+    if (!this.supported()) throw new Error("Web Serial pole selles brauseris saadaval.");
+    // Must be called from a user gesture.
+    this.port = await navigator.serial.requestPort();
+    await this.port.open({ baudRate });
+
+    // Writer (text)
+    const enc = new TextEncoderStream();
+    const writableClosed = enc.readable.pipeTo(this.port.writable);
+    this.writer = enc.writable.getWriter();
+    this._writableClosed = writableClosed;
+
+    // Reader (text -> lines)
+    const dec = new TextDecoderStream();
+    const readableClosed = this.port.readable.pipeTo(dec.writable);
+    this._readableClosed = readableClosed;
+
+    this.reader = dec.readable
+      .pipeThrough(new TransformStream(new LineBreakTransformer()))
+      .getReader();
+
+    this.keepReading = true;
+    this.onStatus("Avatud");
+
+    this._readLoop().catch((e) => this.onError(e));
+  }
+
+  async writeLine(text) {
+    if (!this.writer) return;
+    await this.writer.write(text + "\n");
+  }
+
+  async close() {
     try {
-      while (true) {
-        const {value, done} = await reader.read();
-        if (done) {
-          // allow port to be closed later
-          reader.releaseLock();
-          break;
-        }
-        if (value.includes("ISC")) {
-          console.log("ISC detection correct");
-          console.log(value); // should be a string now
-          dataCounter = 0;
-          dataHasBegun = 1;
-        } else if (value && dataHasBegun && dataCounter<1024) {
-          const parts = value.split(",");
-          serialOutput.push(parseInt(parts[0], 16));
-          serialOutput.push(parseInt(parts[1], 16));
-          console.log(serialOutput);
-          console.log(value);
-          dataCounter+=1;
-        } else if (dataCounter>=1024) {
-          dataHasBegun = 0;
-          serialOutput.length = 0;
-          console.log("Data reset!");
-        }
+      this.keepReading = false;
+      if (this.reader) {
+        await this.reader.cancel();
+        await this._readableClosed?.catch(() => {});
+        this.reader.releaseLock();
+        this.reader = null;
       }
-    } catch (error) {
-      // TODO: Handle non-fatal errors
-      console.trace(error);
+      if (this.writer) {
+        await this.writer.close();
+        await this._writableClosed?.catch(() => {});
+        this.writer.releaseLock?.();
+        this.writer = null;
+      }
+      if (this.port) {
+        await this.port.close();
+        this.port = null;
+      }
+    } finally {
+      this.onStatus("Lahti");
+    }
+  }
+
+  async _readLoop() {
+    while (this.port?.readable && this.keepReading) {
+      const { value, done } = await this.reader.read();
+      if (done) break;
+      if (typeof value === "string" && value.length) this.onLine(value);
     }
   }
 }
 
+// From Chrome Dev docs examples
 class LineBreakTransformer {
-  constructor() {
-    // A container for holding stream data until a new line.
-    this.chunks = "";
-  }
-
+  constructor() { this.chunks = ""; }
   transform(chunk, controller) {
-    // Append new chunks to existing chunks.
     this.chunks += chunk;
-    // For each line breaks in chunks, send the parsed lines out.
-    const lines = this.chunks.split("\0");
-    this.chunks = lines.pop();
-    lines.forEach((line) => controller.enqueue(line));
+    // STM32 USB.println() typically emits \r\n
+    const lines = this.chunks.split(/\r?\n/);
+    this.chunks = lines.pop() ?? "";
+    for (const line of lines) controller.enqueue(line);
   }
-
   flush(controller) {
-    // When the stream is closed, flush any remaining chunks out.
-    controller.enqueue(this.chunks);
+    if (this.chunks) controller.enqueue(this.chunks);
   }
 }
