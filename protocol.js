@@ -8,7 +8,7 @@ const HEADER = Uint8Array.from([
   0x0F, 0xA6, 0x0F, 0xA6, 0x0F, 0xA6, 0x0F, 0xA6
 ]);
 
-export function parseIscFrame(buffer) {
+export function parseIscLine(buffer) {
   if (!(buffer instanceof Uint8Array)) {
     return { ok: false, reason: "Input must be Uint8Array" };
   }
