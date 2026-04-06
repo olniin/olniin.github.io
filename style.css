@@ -1,0 +1,159 @@
+/* DEFAULT FONT -------------------------------------------------------------------------------- */
+html * {
+  font-family: 'Courier New', Courier, monospace !important;
+}
+
+/* THEME VARIABLES ----------------------------------------------------------------------------- */
+:root {
+  /* dark theme (default) */
+  --site-bg:      #111111;
+  --panel-bg:     #2a2a2a;
+  --panel-border: #444444;
+  --body-text:    #eeeeee;
+  --blck-text:    #000000;
+  --btn-default:  #4a4a4a;
+  --btn-active:   #f02222;
+  --accent:       #94b1ff;
+}
+
+body.light {
+  /* light theme */
+  --site-bg:      #eeeeee;
+  --panel-bg:     #d6d6d6;
+  --panel-border: #cccccc;
+  --body-text:    #000000;
+  --btn-default:  #b6b6b6;
+}
+
+body {
+  background: var(--site-bg);
+  color: var(--body-text);
+  margin: 10px;
+}
+
+/* HEADER SETTINGS ----------------------------------------------------------------------------- */
+header {
+  display: grid;
+  grid-template-columns: 4fr 1fr;
+  align-items: center;
+  background-color: var(--panel-bg);
+  border: 2px solid var(--panel-border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.site-options {
+  text-align: right;
+  padding: 10px;
+}
+
+/* BUTTONS ------------------------------------------------------------------------------------- */
+button {
+  background: var(--btn-default);
+  color: var(--body-text);
+  border: 2px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 7px 10px;
+  min-width: 90px;
+  cursor: pointer;
+}
+
+button:hover {
+  border: 2px solid var(--accent);
+}
+
+.theme-toggle-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.theme-toggle-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--body-text);
+}
+
+.active {
+  background-color: var(--btn-active);
+  color: var(--blck-text);
+}
+
+/* SCOPE MAIN STRUCTURE ------------------------------------------------------------------------ */
+main {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+}
+
+.scope-main {
+  display: grid;
+  grid-template-rows: 3fr 1fr;
+}
+
+.scope-side {
+  display: grid;
+  grid-template-rows: 1fr 7fr;
+}
+
+.panel {
+  align-items: center;
+  background-color: var(--panel-bg);
+  border: 2px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.scope-screen {
+  margin: 0px 5px 5px 0px;
+}
+
+.scope-data {
+  margin: 5px 5px 0px 0px;
+}
+
+.scope-connect {
+  margin: 0px 0px 5px 5px;
+  text-align: center;
+}
+
+.scope-settings {
+  margin: 5px 0px 0px 5px;
+}
+
+/* SCOPE SETTINGS ------------------------------------------------------------------------------ */
+.panel-title {
+  margin-bottom: 5px;
+}
+
+.input-group {
+  align-items: center;
+  background-color: var(--panel-bg);
+  color: var(--body-text);
+  font-size: 12px;
+  border: 2px solid var(--panel-border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  padding: 5px;
+}
+
+input[type="number"] {
+  background-color: var(--btn-default);
+  color: var(--body-text);
+  border: 2px solid var(--panel-border);
+  border-radius: 10px;
+  width: 112px;
+  margin: 2px;
+}
+
+select {
+  background-color: var(--btn-default);
+  color: var(--body-text);
+  border: 2px solid var(--panel-border);
+  border-radius: 10px;
+  width: 120px;
+  margin: 2px;
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
