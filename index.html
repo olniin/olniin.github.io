@@ -28,7 +28,7 @@
           font-size="50" font-weight="bold" fill="#94b1ff"
           letter-spacing="-1">_Scope</text>
         <!-- site tagline -->
-        <text x="25" y="80%" font-family="'Courier New', Courier, monospace"
+        <text x="25" y="90%" font-family="'Courier New', Courier, monospace"
           font-size="10" fill="#226a87"
           letter-spacing="2.5">BROWSER OSCILLOSCOPE UI</text>
       </svg>
@@ -43,12 +43,22 @@
   <main>
     <div class="scope-main">
       <!-- scope -->
-      <div class="panel scope-screen">
-        SCOPE
+      <div class="panel screen-area">
+        <canvas id="screen" width="1200" height="720"></canvas>
       </div>
       <!-- data -->
       <div class="panel scope-data">
-        DATA
+        <label>READINGS</label><label></label>
+        <div class="results-group">
+          <label>CH1</label>
+          <label id="ch1-volts">-</label>
+          <label>CH2</label>
+          <label id="ch2-volts">-</label>
+          <label>Frequency</label>
+          <label id="m-freq">-</label>
+          <label>Phase</label>
+          <label id="m-phase">-</label>
+        </div>
       </div>
     </div>
     <div class="scope-side">
@@ -92,16 +102,41 @@
           </select>
         </div>
         <div class="input-group">
-          <label>VOLTAGE</label>
-          <select id="volt-scale">
+          <label>CHANNEL 1</label>
+          <select id="ch1-scale">
             <option value=500>500 mV/div</option>
             <option value=250 selected>250 mV/div</option>
             <option value=100>100 mV/div</option>
             <option value=50>50 mV/div</option>
           </select>
+          <select id="ch1-type" disabled>
+            <option value=0 selected>direct</option>
+            <option value=1>amplified</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>CHANNEL 2</label>
+          <select id="ch2-scale">
+            <option value=500>500 mV/div</option>
+            <option value=250 selected>250 mV/div</option>
+            <option value=100>100 mV/div</option>
+            <option value=50>50 mV/div</option>
+          </select>
+          <select id="ch2-type" disabled>
+            <option value=0 selected>direct</option>
+            <option value=1>amplified</option>
+          </select>
         </div>
       </div>
     </div>
   </main>
+  <!-- status bar in the footer -->
+  <footer>
+    <div class="status-indicator">
+      <div id="statusDot" class="status-dot"></div>
+      <span id="statusText">Disconnected</span>
+      <span id="connTimeout" style="display:none;color:#ff4757;margin-left:10px;font-size:11px;">(Stuck? <a href="#" onclick="forceDisconnect();return false;" style="color:#ff4757;text-decoration:underline;">Force disconnect</a>)</span>
+    </div>
+  </footer>
 </body>
 </html>
