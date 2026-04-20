@@ -51,7 +51,8 @@ function forceDisconnect()
  */
 async function toggleConnection()
 {
-const btn = document.getElementById('connectBtn');  //TODO: ADD "CONNECT BUTTON" IN HTML
+  plotData();
+  const btn = document.getElementById('connectBtn');  //TODO: ADD "CONNECT BUTTON" IN HTML
   if (!isConnected) {
     flushReceiveBuffer();
     try{
@@ -291,7 +292,8 @@ function toggleStop()
 /**
  * Test canvas function.
  */
-window.onload = function() {
+function plotData()
+{
   var canvas = document.getElementById("surface");
   var context = canvas.getContext("2d");
   context.strokeStyle = "00ff00";
