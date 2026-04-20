@@ -292,20 +292,18 @@ function toggleStop()
  * Test canvas function.
  */
 window.onload = function() {
-  var lines = 1000;
-  var scale = 2;
-  var frag = 1;
-  var canvas = document.getElementById("screen");
+  var canvas = document.getElementById("surface");
   var context = canvas.getContext("2d");
-  context.moveTo(0, 100 /*somewhere in the middle*/);     //initial point
+  context.strokeStyle = "00ff00";
+
+  var lines = 200,
+  frag = canvas.clientWidth / lines,
+  scale = canvas.clientHeight / 2;
+
+  context.moveTo(0, scale);
   for (var i = 0; i < lines; i++) {
     var sine = Math.sin(i/scale*2)*scale;
     context.lineTo(i*frag, -sine+scale);
-
-    //i * frag      = the position of x scaled up
-    //-sine + scale = the position of y, flipped, scaled, shifted down
-    //i/scale*2     = random scale I put in... you might want to figure out the
-    //                correct scale with some math
   }
   context.stroke();
 }
