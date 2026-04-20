@@ -292,6 +292,9 @@ function toggleStop()
  * Test canvas function.
  */
 window.onload = function() {
+  var lines = 1000;
+  var scale = 2;
+  var frag = 1;
   var canvas = document.getElementById("screen");
   var context = canvas.getContext("2d");
   context.moveTo(0, 100 /*somewhere in the middle*/);     //initial point
