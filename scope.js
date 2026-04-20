@@ -71,7 +71,7 @@ const btn = document.getElementById('connectBtn');  //TODO: ADD "CONNECT BUTTON"
       writer = port.writable.getWriter();
       reader = port.readable.getReader();
       isConnected = true;
-      btn.textContent='Disconnect';
+      btn.textContent='DISCON';
       btn.classList.add('active');  // TODO: ADD CSS CLASS "ACTIVE"
       updateStatus(true);
       showTimeoutWarning(false);
@@ -133,7 +133,7 @@ async function disconnect(force=false)
     port = null;
   }
 
-  btn.textContent='Connect ISC Scope';
+  btn.textContent='CONNECT';
   btn.classList.remove('active');
   btn.disabled = false;
 }
