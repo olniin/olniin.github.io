@@ -297,7 +297,7 @@ function plotData()
   
 const data = [10, 40, 25, 60, 80, 30, 50, 90, 70];
 
-  const canvas = document.getElementById('plot');
+  const canvas = document.getElementById("screen");
   const ctx = canvas.getContext('2d');
 
   const padding = 20;
