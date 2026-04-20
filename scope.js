@@ -294,7 +294,7 @@ function toggleStop()
  */
 function plotData()
 {
-  var canvas = document.getElementById("surface");
+  var canvas = document.getElementById("screen");
   var context = canvas.getContext("2d");
   context.strokeStyle = "00ff00";
 
