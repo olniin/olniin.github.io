@@ -294,20 +294,42 @@ function toggleStop()
  */
 function plotData()
 {
-  var canvas = document.getElementById("screen");
-  var context = canvas.getContext("2d");
-  context.strokeStyle = "00ff00";
+  
+const data = [10, 40, 25, 60, 80, 30, 50, 90, 70];
 
-  var lines = 200,
-  frag = canvas.clientWidth / lines,
-  scale = canvas.clientHeight / 2;
+  const canvas = document.getElementById('plot');
+  const ctx = canvas.getContext('2d');
 
-  context.moveTo(0, scale);
-  for (var i = 0; i < lines; i++) {
-    var sine = Math.sin(i/scale*2)*scale;
-    context.lineTo(i*frag, -sine+scale);
-  }
-  context.stroke();
+  const padding = 20;
+  const w = canvas.width - 2 * padding;
+  const h = canvas.height - 2 * padding;
+
+  const maxVal = Math.max(...data);
+  const minVal = Math.min(...data);
+
+  const xStep = w / (data.length - 1);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.beginPath();
+  ctx.strokeStyle = '#0078d4';
+  ctx.lineWidth = 2;
+
+  data.forEach((value, index) => {
+    const x = padding + index * xStep;
+
+    // Invert Y-axis for canvas coordinates
+    const y = padding + h - ((value - minVal) / (maxVal - minVal)) * h;
+
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+
+  ctx.stroke();
+
 }
 
 /**
