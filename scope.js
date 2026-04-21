@@ -58,7 +58,6 @@ function forceDisconnect()
  */
 async function toggleConnection()
 {
-  plotData();
   const btn = document.getElementById('connectBtn');  //TODO: ADD "CONNECT BUTTON" IN HTML
   if (!isConnected) {
     flushReceiveBuffer();
