@@ -16,6 +16,13 @@ let bufferTimeout = null;
 /* DATA VARIABLES ------------------------------------------------------------------------------ */
 let isRunning = true;
 
+// data
+const MARKER = Uint8Array.from([0xFA, 0x6F, 0xA6, 0xFA, 0x6F, 0xA6]);
+
+let markerIndex = 0;
+let collecting = false;
+let payload = [];
+
 /* CHECK BROWSER SUPPORT ----------------------------------------------------------------------- */
 //if (!('serial' in navigator)) {
 //    alert('Web Serial API is not supported in this browser. Please use Chrome, Edge, or Opera.');
@@ -203,12 +210,36 @@ function flushReceiveBuffer()
  */
 function processReceivedData(data)
 {
-  // TODO: ADD DATA PROCESSING
-  //rxBytes += data.length;
-  //updateStats();
+  for (let i = 0; i < data.length; i++) {
+    const byte = data[i];
 
-  // Queue data for batched logging instead of immediate DOM update
-  //queueLogData(data, 'rx');
+    /* Marker byte matching (split-safe) */
+    if (byte === MARKER[markerIndex]) {
+      markerIndex++;
+    } else {
+      markerIndex = (byte === MARKER[0]) ? 1 : 0;
+    }
+
+    /* Marker fully detected */
+    if (markerIndex === MARKER.length) {
+      markerIndex = 0;
+
+      if (collecting) {
+        /* Finish previous frame */
+        handleFrame(Uint8Array.from(payload));
+        payload = [];
+      }
+
+      /* Start collecting a new frame */
+      collecting = true;
+      continue; // marker bytes never included
+    }
+
+    /* Collect payload */
+    if (collecting) {
+      payload.push(byte);
+    }
+  }
 }
 
 /**
@@ -289,30 +320,48 @@ function toggleStop()
   }
 }
 
+
+function handleFrame(frameU8)
+{
+  const len = frameU8.length;
+
+  // Ensure even number of bytes
+  if (len % 2 !== 0) {
+    console.warn("Frame length is not even, dropping last byte");
+  }
+
+  const u16Count = Math.floor(len / 2);
+  const frameU16 = new Uint16Array(u16Count);
+
+  for (let i = 0; i < u16Count; i++) {
+    frameU16[i] = (frameU8[i * 2] << 8) | frameU8[i * 2 + 1];
+  }
+
+  plotFrame(frameU16);
+}
+
 /**
  * Test canvas function.
  */
-function plotData()
+function plotFrame(data)
 {
-  
-const data = [10, 40, 25, 60, 80, 30, 50, 90, 70];
-
+  //const data = [10, 40, 25, 60, 80, 30, 50, 90, 70];
   const canvas = document.getElementById("screen");
   const ctx = canvas.getContext('2d');
 
-  const padding = 20;
+  const padding = 10;
   const w = canvas.width - 2 * padding;
   const h = canvas.height - 2 * padding;
 
-  const maxVal = Math.max(...data);
-  const minVal = Math.min(...data);
-
-  const xStep = w / (data.length - 1);
+  // min & max from ADC:
+  const maxVal = 4095;
+  const minVal = 0;
+  const xStep = w / (512-1);
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   ctx.beginPath();
-  ctx.strokeStyle = '#0078d4';
+  ctx.strokeStyle = '#94b1ff';
   ctx.lineWidth = 2;
 
   data.forEach((value, index) => {
@@ -329,13 +378,12 @@ const data = [10, 40, 25, 60, 80, 30, 50, 90, 70];
   });
 
   ctx.stroke();
-
 }
 
 /**
  * Update status indicator.
  *
- * @param {*} connected 
+ * @param {boolean} connected
  */
 function updateStatus(connected)
 {
