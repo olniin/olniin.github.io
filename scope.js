@@ -17,7 +17,7 @@ let bufferTimeout = null;
 let isRunning = true;
 
 // data
-const MARKER = Uint8Array.from([0xFA, 0x6F, 0xA6, 0xFA, 0x6F, 0xA6]);
+const MARKER = Uint8Array.from([0x0F, 0xA6, 0x0F, 0xA6, 0x0F, 0xA6]);
 
 let markerIndex = 0;
 let collecting = false;
