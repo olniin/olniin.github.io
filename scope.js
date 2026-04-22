@@ -330,45 +330,30 @@ function toggleStop()
   }
 }
 
-
-
-
 function handleFrame(frameU8)
 {
-  // Must be divisible by 4 (CH1+CH2)
-  let usableLen = frameU8.length - (frameU8.length % 4);
-  if (usableLen < 8) return;
+  // Must contain at least 2 channels (4 bytes)
+  if (frameU8.length < 8) return;
 
-  let offset = 0;
+  // ✅ Drop first CH1+CH2 sample (ADC warm‑up)
+  let offset = 4;
 
-  // --- PHASE DETECTION ---
-  // If first CH1 sample is maxed, skip first sample pair
-  const firstSample =
-    (frameU8[0] << 8) | frameU8[1];
-
-  if (firstSample >= 4095) {
-    offset = 2; // skip one 16-bit value
-  }
-
-  usableLen -= offset;
+  let usableLen = frameU8.length - offset;
   usableLen -= (usableLen % 4);
+  if (usableLen <= 0) return;
 
   const sampleCount = usableLen / 4;
-  if (sampleCount <= 0) return;
-
   const ch1 = new Uint16Array(sampleCount);
   const ch2 = new Uint16Array(sampleCount);
 
   for (let i = 0; i < sampleCount; i++) {
     const b = offset + i * 4;
-
     ch1[i] = (frameU8[b] << 8) | frameU8[b + 1];
     ch2[i] = (frameU8[b + 2] << 8) | frameU8[b + 3];
   }
 
   plotFrame(ch1, ch2);
 }
-
 
 /**
  * Test canvas function.
