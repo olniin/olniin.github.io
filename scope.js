@@ -335,7 +335,7 @@ function handleFrame(frameU8)
   // Must contain at least 2 channels (4 bytes)
   if (frameU8.length < 8) return;
 
-  // ✅ Drop first CH1+CH2 sample (ADC warm‑up)
+  // Drop first CH1+CH2 sample (ADC warm‑up)
   let offset = 4;
 
   let usableLen = frameU8.length - offset;
@@ -360,6 +360,7 @@ function handleFrame(frameU8)
  */
 function plotFrame(data1, data2)
 {
+  if (!isRunning) return;
   //const data = [10, 40, 25, 60, 80, 30, 50, 90, 70];
   const canvas = document.getElementById("screen");
   const ctx = canvas.getContext('2d');
