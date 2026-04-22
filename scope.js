@@ -320,26 +320,45 @@ function toggleStop()
 }
 
 
+
 function handleFrame(frameU8)
 {
-  const len = frameU8.length;
+  // Enforce 2‑channel alignment (4 bytes per sample-pair)
+  const alignedLen = frameU8.length - (frameU8.length % 4);
 
-  // Ensure even number of bytes
-  if (len % 2 !== 0) {
-    console.warn("Frame length is not even, dropping last byte");
+  if (alignedLen !== frameU8.length) {
+    console.warn("Frame trimmed for channel alignment");
   }
 
-  const u16Count = Math.floor(len / 4);
+  const u16Count = alignedLen / 4;
+
   const frameU16ch1 = new Uint16Array(u16Count);
   const frameU16ch2 = new Uint16Array(u16Count);
 
   for (let i = 0; i < u16Count; i++) {
-    frameU16ch1[i] = (frameU8[i * 4] << 8) | frameU8[i * 4 + 1];
-    frameU16ch2[i] = (frameU8[i * 4 + 2] << 8) | frameU8[i * 4 + 3];
+    const base = i * 4;
+
+    frameU16ch1[i] =
+      (frameU8[base] << 8) | frameU8[base + 1];
+
+    frameU16ch2[i] =
+      (frameU8[base + 2] << 8) | frameU8[base + 3];
   }
+
+
+  console.assert(
+    (frameU8.length % 4) === 0,
+    "Frame is not divisible into CH1+CH2 samples"
+  );
+
+  console.assert(
+    frameU16ch1.length === frameU16ch2.length,
+    "Channel length mismatch"
+  );
 
   plotFrame(frameU16ch1, frameU16ch2);
 }
+
 
 /**
  * Test canvas function.
@@ -357,7 +376,7 @@ function plotFrame(data1, data2)
   // min & max from ADC:
   const maxVal = 4095;
   const minVal = 0;
-  const xStep = w / (512-1);
+  const xStep = w / (data1.length - 1);
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
