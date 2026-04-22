@@ -329,20 +329,21 @@ function handleFrame(frameU8)
     console.warn("Frame length is not even, dropping last byte");
   }
 
-  const u16Count = Math.floor(len / 2);
-  const frameU16 = new Uint16Array(u16Count);
+  const u16Count = Math.floor(len / 4);
+  const frameU16ch1 = new Uint16Array(u16Count);
+  const frameU16ch2 = new Uint16Array(u16Count);
 
   for (let i = 0; i < u16Count; i++) {
-    frameU16[i] = (frameU8[i * 2] << 8) | frameU8[i * 2 + 1];
+    frameU16ch1[i] = (frameU8[i * 2] << 8) | frameU8[i * 2 + 1];
   }
 
-  plotFrame(frameU16);
+  plotFrame(frameU16ch1, frameU16ch2);
 }
 
 /**
  * Test canvas function.
  */
-function plotFrame(data)
+function plotFrame(data1, data2)
 {
   //const data = [10, 40, 25, 60, 80, 30, 50, 90, 70];
   const canvas = document.getElementById("screen");
@@ -363,7 +364,23 @@ function plotFrame(data)
   ctx.strokeStyle = '#94b1ff';
   ctx.lineWidth = 2;
 
-  data.forEach((value, index) => {
+  data1.forEach((value, index) => {
+    const x = padding + index * xStep;
+
+    // Invert Y-axis for canvas coordinates
+    const y = padding + h - ((value - minVal) / (maxVal - minVal)) * h;
+
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+
+  ctx.beginPath();
+  ctx.strokeStyle = '#ff6600';
+  ctx.lineWidth = 2;
+  data2.forEach((value, index) => {
     const x = padding + index * xStep;
 
     // Invert Y-axis for canvas coordinates
