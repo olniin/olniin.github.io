@@ -335,6 +335,7 @@ function handleFrame(frameU8)
 
   for (let i = 0; i < u16Count; i++) {
     frameU16ch1[i] = (frameU8[i * 2] << 8) | frameU8[i * 2 + 1];
+    frameU16ch2[i] = (frameU8[i * 2 + 2] << 8) | frameU8[i * 2 + 3];
   }
 
   plotFrame(frameU16ch1, frameU16ch2);
