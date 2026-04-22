@@ -255,10 +255,9 @@ function processReceivedData(data)
 /**
  * Send commands to MCU as hex values.
  *
- * @param {HTMLElement} btnElement
  * @returns null at failure
- *//*
-async function sendHex(btnElement)  //TODO: IN HTML <button onclick="sendHex(this)">Send HEX</button>
+ */
+async function sendHex()  //TODO: IN HTML <button onclick="sendHex(this)">Send HEX</button>
 {
   if (!isConnected) {
     alert('Please connect to ISC Scope first!');
@@ -266,55 +265,25 @@ async function sendHex(btnElement)  //TODO: IN HTML <button onclick="sendHex(thi
   }
 
   // find the input field associated with this button // TODO: NEED FREQ, WAVE TYPE, ATTENUATION
-    const row = btnElement.closest('.send-row, .dynamic-field');
-    const input = row.querySelector('.hex-input, .hex-input-dynamic');
+  const inputFreq = document.getElementById("gen-freq");
+  const inputType = document.getElementById("gen-wave");
+  const inputAttn = document.getElementById("gen-attn");
 
-    if (!input) return;
+  //if (!input_freq) return;
+  const freqValue = inputFreq.value;
+  const typeValue = inputType.value;
+  const attnValue = inputAttn.value;
 
-    const inputValue = input.value.trim();
-    if (!inputValue) return;
+  const data = new Uint8Array([0x55, 0x55, 0x55, (((0b00001100&typeValue)<<2)|(0b00000011&attnValue)), (0xFF&(inputFreq>>24)), (0xFF&(inputFreq>>16)), (0xFF&(inputFreq>>8)), (0xFF&inputFreq)]);
 
-    try {
-        const hexPairs = inputValue.split(/\s+/).filter(p => p.length > 0);
-        const bytes = hexPairs
-            .map(b => parseInt(b, 16))
-            .filter(b => !isNaN(b) && b >= 0 && b <= 255);
-
-        if (bytes.length === 0) {
-            alert('Invalid HEX input');
-            return;
-        }
-
-        // Validate that all hex pairs are complete (2 characters each)
-        const invalidPairs = hexPairs.filter(p => p.length !== 2 || isNaN(parseInt(p, 16)));
-        if (invalidPairs.length > 0) {
-            alert(`Invalid HEX pairs: ${invalidPairs.join(', ')}`);
-            return;
-        }
-
-        const data = new Uint8Array(bytes);
-        const ending = getLineEnding();
-        if (ending) {
-            const endingBytes = new TextEncoder().encode(ending);
-            const combined = new Uint8Array(data.length + endingBytes.length);
-            combined.set(data);
-            combined.set(endingBytes, data.length);
-            await writer.write(combined);
-            txBytes += combined.length;
-            logData(combined, 'tx');
-        } else {
-            await writer.write(data);
-            txBytes += data.length;
-            logData(data, 'tx');
-        }
-
-        updateStats();
-        // Input stays after sending - NOT clearing
-    } catch (err) {
-        console.error('Send error:', err);
-        alert('Failed to send: ' + err.message);
-    }
-}*/
+  try {
+    await writer.write(data);
+    console.log('CMD sent!');
+  } catch (err) {
+    console.error('Send error:', err);
+    alert('Failed to send: ' + err.message);
+  }
+}
 
 /**
  * Toggle scope display update.
