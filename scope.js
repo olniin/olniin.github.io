@@ -377,6 +377,8 @@ function plotFrame(data1, data2)
       ctx.lineTo(x, y);
     }
   });
+  
+  ctx.stroke();
 
   ctx.beginPath();
   ctx.strokeStyle = '#ff6600';
