@@ -277,7 +277,7 @@ async function sendHex()  //TODO: IN HTML <button onclick="sendHex(this)">Send H
   const attnValue = inputAttn.value;
   console.log(attnValue);
 
-  const data = new Uint8Array([0x55, 0x55, 0x55, (((0b00001100&typeValue)<<2)|(0b00000011&attnValue)), (0xFF&(inputFreq>>24)), (0xFF&(inputFreq>>16)), (0xFF&(inputFreq>>8)), (0xFF&inputFreq)]);
+  const data = new Uint8Array([0x55, 0x55, 0x55, (((0b00000011&typeValue)<<2)|(0b00000011&attnValue)), (0xFF&(inputFreq>>24)), (0xFF&(inputFreq>>16)), (0xFF&(inputFreq>>8)), (0xFF&inputFreq)]);
 
   try {
     await writer.write(data);
