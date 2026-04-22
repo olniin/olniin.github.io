@@ -22,6 +22,7 @@ const MARKER = Uint8Array.from([0x0F, 0xA6, 0x0F, 0xA6, 0x0F, 0xA6]);
 let markerIndex = 0;
 let collecting = false;
 let payload = [];
+let markerBuf = []; // holds bytes that may belong to marker
 
 /* CHECK BROWSER SUPPORT ----------------------------------------------------------------------- */
 //if (!('serial' in navigator)) {
@@ -207,39 +208,49 @@ function flushReceiveBuffer()
  *
  * @param {Uint8Array} data - data array to be processed
  */
+
 function processReceivedData(data)
 {
   for (let i = 0; i < data.length; i++) {
     const byte = data[i];
 
-    /* Marker byte matching (split-safe) */
     if (byte === MARKER[markerIndex]) {
+      markerBuf.push(byte);
       markerIndex++;
-    } else {
-      markerIndex = (byte === MARKER[0]) ? 1 : 0;
-    }
 
-    /* Marker fully detected */
-    if (markerIndex === MARKER.length) {
-      markerIndex = 0;
+      // full marker detected
+      if (markerIndex === MARKER.length) {
+        markerIndex = 0;
+        markerBuf.length = 0;
 
-      if (collecting) {
-        /* Finish previous frame */
-        handleFrame(Uint8Array.from(payload));
-        payload = [];
+        if (collecting) {
+          handleFrame(Uint8Array.from(payload));
+          payload = [];
+        }
+
+        collecting = true;
       }
 
-      /* Start collecting a new frame */
-      collecting = true;
-      continue; // marker bytes never included
+      continue;
     }
 
-    /* Collect payload */
+    // marker match failed
+    if (markerIndex > 0) {
+      // bytes in markerBuf are NOT marker → flush them safely
+      if (collecting) {
+        payload.push(...markerBuf);
+      }
+      markerBuf.length = 0;
+      markerIndex = 0;
+    }
+
+    // normal payload byte
     if (collecting) {
       payload.push(byte);
     }
   }
 }
+
 
 /**
  * Send commands to MCU as hex values.
