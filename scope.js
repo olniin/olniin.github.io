@@ -332,42 +332,41 @@ function toggleStop()
 
 
 
+
 function handleFrame(frameU8)
 {
-  // Enforce 2‑channel alignment (4 bytes per sample-pair)
-  const alignedLen = frameU8.length - (frameU8.length % 4);
+  // Must be divisible by 4 (CH1+CH2)
+  let usableLen = frameU8.length - (frameU8.length % 4);
+  if (usableLen < 8) return;
 
-  if (alignedLen !== frameU8.length) {
-    console.warn("Frame trimmed for channel alignment");
+  let offset = 0;
+
+  // --- PHASE DETECTION ---
+  // If first CH1 sample is maxed, skip first sample pair
+  const firstSample =
+    (frameU8[0] << 8) | frameU8[1];
+
+  if (firstSample >= 4095) {
+    offset = 2; // skip one 16-bit value
   }
 
-  const u16Count = alignedLen / 4;
+  usableLen -= offset;
+  usableLen -= (usableLen % 4);
 
-  const frameU16ch1 = new Uint16Array(u16Count);
-  const frameU16ch2 = new Uint16Array(u16Count);
+  const sampleCount = usableLen / 4;
+  if (sampleCount <= 0) return;
 
-  for (let i = 0; i < u16Count; i++) {
-    const base = i * 4;
+  const ch1 = new Uint16Array(sampleCount);
+  const ch2 = new Uint16Array(sampleCount);
 
-    frameU16ch1[i] =
-      (frameU8[base] << 8) | frameU8[base + 1];
+  for (let i = 0; i < sampleCount; i++) {
+    const b = offset + i * 4;
 
-    frameU16ch2[i] =
-      (frameU8[base + 2] << 8) | frameU8[base + 3];
+    ch1[i] = (frameU8[b] << 8) | frameU8[b + 1];
+    ch2[i] = (frameU8[b + 2] << 8) | frameU8[b + 3];
   }
 
-
-  console.assert(
-    (frameU8.length % 4) === 0,
-    "Frame is not divisible into CH1+CH2 samples"
-  );
-
-  console.assert(
-    frameU16ch1.length === frameU16ch2.length,
-    "Channel length mismatch"
-  );
-
-  plotFrame(frameU16ch1, frameU16ch2);
+  plotFrame(ch1, ch2);
 }
 
 
