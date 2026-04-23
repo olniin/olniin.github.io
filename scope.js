@@ -282,6 +282,7 @@ async function sendHex()  //TODO: IN HTML <button onclick="sendHex(this)">Send H
   try {
     await writer.write(data);
     console.log('CMD sent!');
+    console.log(`CMD: ${data.join(', ')}`);
   } catch (err) {
     console.error('Send error:', err);
     alert('Failed to send: ' + err.message);
@@ -300,6 +301,51 @@ function toggleStop()
     btn.classList.toggle('active');
     btn.textContent = isRunning ? 'STOP' : 'RUN';
   }
+}
+
+function sinc(x)
+{
+  if (x === 0) return 1;
+  const px = Math.PI * x;
+  return Math.sin(px) / px;
+}
+
+function hamming(n, N)
+{
+  return 0.54 - 0.46 * Math.cos((2 * Math.PI * n) / (N - 1));
+}
+
+function sincInterpolate(input, upFactor = 4, radius = 8)
+{
+  const inLen = input.length;
+  const outLen = inLen * upFactor;
+  const output = new Float32Array(outLen);
+
+  const kernelSize = radius * 2 + 1;
+
+  for (let i = 0; i < outLen; i++) {
+    const t = i / upFactor;
+    const idx = Math.floor(t);
+
+    let sum = 0;
+    let norm = 0;
+
+    for (let k = -radius; k <= radius; k++) {
+      const n = idx + k;
+      if (n < 0 || n >= inLen) continue;
+
+      const x = t - n;
+      const w = hamming(k + radius, kernelSize);
+      const s = sinc(x) * w;
+
+      sum += input[n] * s;
+      norm += s;
+    }
+
+    output[i] = norm !== 0 ? sum / norm : 0;
+  }
+
+  return output;
 }
 
 function handleFrame(frameU8)
@@ -324,7 +370,14 @@ function handleFrame(frameU8)
     ch2[i] = (frameU8[b + 2] << 8) | frameU8[b + 3];
   }
 
-  plotFrame(ch1, ch2);
+  
+const ch1f = Float32Array.from(frameU16ch1);
+const ch2f = Float32Array.from(frameU16ch2);
+
+const ch1Interp = sincInterpolate(ch1f, 4);
+const ch2Interp = sincInterpolate(ch2f, 4);
+
+plotFrame(ch1Interp, ch2Interp);
 }
 
 /**
