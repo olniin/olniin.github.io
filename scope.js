@@ -371,8 +371,8 @@ function handleFrame(frameU8)
   }
 
   
-const ch1f = Float32Array.from(frameU16ch1);
-const ch2f = Float32Array.from(frameU16ch2);
+const ch1f = Float32Array.from(ch1);
+const ch2f = Float32Array.from(ch2);
 
 const ch1Interp = sincInterpolate(ch1f, 4);
 const ch2Interp = sincInterpolate(ch2f, 4);
