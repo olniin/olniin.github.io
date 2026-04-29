@@ -418,8 +418,7 @@ function plotFrame(data1, data2)
   const yTrig = padding + h - ((trig - minVal) / (maxVal - minVal)) * h;
 
   ctx.save();
-  ctx.setLineDash([6, 4]);              // dashed line
-  ctx.strokeStyle = '#ff4757';          // scope‑style red
+  ctx.strokeStyle = '#2a2a2a';
   ctx.lineWidth = 1;
 
   ctx.beginPath();
@@ -429,7 +428,7 @@ function plotFrame(data1, data2)
 
   // optional label
   ctx.setLineDash([]);
-  ctx.fillStyle = '#ff4757';
+  ctx.fillStyle = '#2a2a2a';
   ctx.font = '11px Courier New';
   ctx.fillText('TRIG', padding + 5, yTrig - 4);
 
