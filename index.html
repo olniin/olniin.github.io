@@ -89,7 +89,7 @@
         </div>
         <div class="input-group">
           <label>TRIGGER</label>
-          <input type="number" id="gen-trig" value="2047" min="0" step="1" max="4095" onchange="sendHex()" onkeypress="if(event.key==='Enter') {event.target.blur();sendHex();}">
+          <input type="range" id="gen-trig" value="2047" min="0" step="1" max="4095" onchange="sendHex()" onkeypress="if(event.key==='Enter') {event.target.blur();sendHex();}">
         </div>
         <div class="input-group">
           <label>TIME SCALE</label>
