@@ -412,6 +412,29 @@ function plotFrame(data1, data2)
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  // trigger level
+  const trig = Math.min(maxVal, Math.max(minVal, triggerLevel));
+  const yTrig = padding + h - ((trig - minVal) / (maxVal - minVal)) * h;
+
+  ctx.save();
+  ctx.setLineDash([6, 4]);              // dashed line
+  ctx.strokeStyle = '#ff4757';          // scope‑style red
+  ctx.lineWidth = 1;
+
+  ctx.beginPath();
+  ctx.moveTo(padding, yTrig);
+  ctx.lineTo(padding + w, yTrig);
+  ctx.stroke();
+
+  // optional label
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#ff4757';
+  ctx.font = '11px Courier New';
+  ctx.fillText('TRIG', padding + 5, yTrig - 4);
+
+  ctx.restore();
+
+  // wave data
   ctx.beginPath();
   ctx.strokeStyle = '#94b1ff';
   ctx.lineWidth = 2;
@@ -449,6 +472,14 @@ function plotFrame(data1, data2)
 
   ctx.stroke();
 }
+
+function updateTrigger()
+{
+  const slider = document.getElementById('gen-trig');
+  if (!slider) return;
+  triggerLevel = Number(slider.value) >>> 0;
+}
+
 
 /**
  * Update status indicator.
