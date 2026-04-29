@@ -418,7 +418,7 @@ function plotFrame(data1, data2)
   const yTrig = padding + h - ((trig - minVal) / (maxVal - minVal)) * h;
 
   ctx.save();
-  ctx.strokeStyle = '#2a2a2a';
+  ctx.strokeStyle = '#226a87';
   ctx.lineWidth = 1;
 
   ctx.beginPath();
@@ -428,7 +428,7 @@ function plotFrame(data1, data2)
 
   // optional label
   ctx.setLineDash([]);
-  ctx.fillStyle = '#2a2a2a';
+  ctx.fillStyle = '#226a87';
   ctx.font = '11px Courier New';
   ctx.fillText('TRIG', padding + 5, yTrig - 4);
 
