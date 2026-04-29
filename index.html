@@ -6,7 +6,7 @@
   <title>ISC Web Oscilloscope</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="stylesheet" href="style.css">
-  <script src="scope.js"></script>
+  <script src="scope.js" defer></script>
 </head>
 <body>
   <header>
@@ -74,18 +74,22 @@
         </div>
         <div class="input-group">
           <label>GENERATOR</label>
-          <input type="number" id="gen-freq" value="1000" onchange="sendHex()" onkeypress="if(event.key==='Enter') {event.target.blur();sendHex();}">
+          <input type="number" id="gen-freq" value="1000" min="10" step="1" max="50000" onchange="sendHex()" onkeypress="if(event.key==='Enter') {event.target.blur();sendHex();}">
           <label>Hz</label>
-          <select id="gen-wave">
+          <select id="gen-wave" onchange="sendHex()">
             <option value=0 selected>Sine</option>
             <option value=1>Triangle</option>
             <option value=2>Square</option>
           </select>
-          <select id="gen-attn">
+          <select id="gen-attn" onchange="sendHex()">
             <option value=0 selected>0 dB</option>
             <option value=1>-6 dB</option>
             <option value=2>-20 dB</option>
           </select>
+        </div>
+        <div class="input-group">
+          <label>TRIGGER</label>
+          <input type="number" id="gen-trig" value="2047" min="0" step="1" max="4095" onchange="sendHex()" onkeypress="if(event.key==='Enter') {event.target.blur();sendHex();}">
         </div>
         <div class="input-group">
           <label>TIME SCALE</label>

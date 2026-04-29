@@ -12,6 +12,7 @@ let txBytes = 0;
 let receiveBuffer = [];
 let lastReceiveTime = 0;
 let bufferTimeout = null;
+const MAX_BUFFER_SIZE = 65536;
 
 /* DATA VARIABLES ------------------------------------------------------------------------------ */
 let isRunning = true;
@@ -257,32 +258,42 @@ function processReceivedData(data)
  *
  * @returns null at failure
  */
-async function sendHex()  //TODO: IN HTML <button onclick="sendHex(this)">Send HEX</button>
+async function sendHex()
 {
-  if (!isConnected) {
+  if (!isConnected || !writer) {
     alert('Please connect to ISC Scope first!');
     return;
   }
 
-  // find the input field associated with this button // TODO: NEED FREQ, WAVE TYPE, ATTENUATION
-  const inputFreq = document.getElementById("gen-freq");
-  const inputType = document.getElementById("gen-wave");
-  const inputAttn = document.getElementById("gen-attn");
+  const inputFreq = document.getElementById('gen-freq');
+  const inputType = document.getElementById('gen-wave');
+  const inputAttn = document.getElementById('gen-attn');
+  const inputTrig = document.getElementById('gen-trig');
 
-  //if (!input_freq) return;
-  const freqValue = inputFreq.value;
-  console.log(freqValue);
-  const typeValue = inputType.value;
-  console.log(typeValue);
-  const attnValue = inputAttn.value;
-  console.log(attnValue);
+  const freq = Number.parseInt(inputFreq?.value ?? '0', 10) >>> 0;  // uint32
+  const type = Number.parseInt(inputType?.value ?? '0', 10) & 0x03; // 2 bits
+  const attn = Number.parseInt(inputAttn?.value ?? '0', 10) & 0x03; // 2 bits
+  const trig = Number.parseInt(inputTrig?.value ?? '0', 10) >>> 0;  // uint16
 
-  const data = new Uint8Array([0x55, 0x55, 0x55, (((0b00000011&typeValue)<<2)|(0b00000011&attnValue)), (0xFF&(inputFreq>>24)), (0xFF&(inputFreq>>16)), (0xFF&(inputFreq>>8)), (0xFF&inputFreq)]);
+  // clamp input frequency
+  const freqClamped = Math.min(Math.max(freq, 10), 50000) >>> 0;
+
+  const mode = ((type & 0x03) << 2) | (attn & 0x03);
+
+  const data = new Uint8Array([
+    0x47, 0xF7, 0xF7,
+    (trig >>>  8) & 0xFF,
+    (trig >>>  0) & 0xFF,
+    mode,
+    (freqClamped >>> 24) & 0xFF,
+    (freqClamped >>> 16) & 0xFF,
+    (freqClamped >>>  8) & 0xFF,
+    (freqClamped >>>  0) & 0xFF
+  ]);
 
   try {
     await writer.write(data);
-    console.log('CMD sent!');
-    console.log(`CMD: ${data.join(', ')}`);
+    console.log('CMD sent!', data);
   } catch (err) {
     console.error('Send error:', err);
     alert('Failed to send: ' + err.message);
@@ -296,11 +307,9 @@ function toggleStop()
 {
   const btn = document.getElementById('stopBtn');
 
-  if (true) {
-    isRunning = !isRunning;
-    btn.classList.toggle('active');
-    btn.textContent = isRunning ? 'STOP' : 'RUN';
-  }
+  isRunning = !isRunning;
+  btn.classList.toggle('active');
+  btn.textContent = isRunning ? 'STOP' : 'RUN';
 }
 
 function sinc(x)
@@ -354,7 +363,7 @@ function handleFrame(frameU8)
   if (frameU8.length < 8) return;
 
   // Drop first CH1+CH2 sample (ADC warm‑up)
-  let offset = 4;
+  let offset = 0;
 
   let usableLen = frameU8.length - offset;
   usableLen -= (usableLen % 4);
@@ -397,7 +406,9 @@ function plotFrame(data1, data2)
   // min & max from ADC:
   const maxVal = 4095;
   const minVal = 0;
-  const xStep = w / (data1.length - 1);
+  const n = Math.min(data1.length, data2.length);
+  const xStep = w / (n - 1);
+
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
