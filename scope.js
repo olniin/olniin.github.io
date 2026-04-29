@@ -16,6 +16,7 @@ const MAX_BUFFER_SIZE = 65536;
 
 /* DATA VARIABLES ------------------------------------------------------------------------------ */
 let isRunning = true;
+let triggerLevel = 2047;
 
 // data
 const MARKER = Uint8Array.from([0x0F, 0xA6, 0x0F, 0xA6, 0x0F, 0xA6]);
