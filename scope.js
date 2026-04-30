@@ -472,7 +472,7 @@ function drawGrid(ctx, padding, w, h)
 function codeToVolts(code, zeroCode)
 {
   const voltsPerCode = VREF / ADC_MAX;
-  return (code - zeroCode) * voltsPerCode * 1.45;
+  return (code - zeroCode) * voltsPerCode * 3;
 }
 
 function voltsToCanvasY(volts, voltsPerDiv, padding, h)
