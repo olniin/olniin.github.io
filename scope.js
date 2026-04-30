@@ -507,7 +507,7 @@ function plotFrame(data1, data2)
   // how many samples should fill the screen based on time/div?
   const timePerDivSec = (timeMsPerDiv / 1000);
   const samplesPerDiv = effectiveRateHz * timePerDivSec;
-  const targetSamples = Math.floor(samplesPerDiv * H_DIVS);
+  const targetSamples = Math.max(16, Math.floor(samplesPerDiv * H_DIVS));
 
   // choose a window from the end of the arrays (like a live scope)
   const nAvail = Math.min(data1.length, data2.length);
@@ -557,10 +557,16 @@ function plotFrame(data1, data2)
     ctx.strokeStyle = '#94b1ff';
     ctx.lineWidth = 2;
 
-    const xStep = w / (windowLen - 1);
+    
+    const totalTimeSec = timePerDivSec * H_DIVS;
+    const xStep = w / (totalTimeSec * effectiveRateHz);
+
 
     for (let i = 0; i < windowLen; i++) {
-      const x = padding + i * xStep;
+      
+      const timeSec = i / effectiveRateHz;
+      const x = padding + timeSec / totalTimeSec * w;
+
 
       // data1 is interpolated float array of ADC codes; it may overshoot a bit
       const code = Math.max(0, Math.min(ADC_MAX, data1[start + i]));
@@ -585,10 +591,16 @@ function plotFrame(data1, data2)
     ctx.strokeStyle = '#ff6600';
     ctx.lineWidth = 2;
 
-    const xStep = w / (windowLen - 1);
+    
+    const totalTimeSec = timePerDivSec * H_DIVS;
+    const xStep = w / (totalTimeSec * effectiveRateHz);
+
 
     for (let i = 0; i < windowLen; i++) {
-      const x = padding + i * xStep;
+      
+      const timeSec = i / effectiveRateHz;
+      const x = padding + timeSec / totalTimeSec * w;
+
 
       const code = Math.max(0, Math.min(ADC_MAX, data2[start + i]));
       const volts = codeToVolts(code, ch2ZeroCode);
