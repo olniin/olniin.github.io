@@ -38,7 +38,7 @@ const INTERP_UP = 4;
 
 // Set this to your real sample rate (before interpolation).
 // From your earlier setup, you mentioned TIM3 ~ 500 kHz triggering ADC:
-let sampleRateHz = 500000;
+let sampleRateHz = 100000;
 
 // 0V reference as ADC code (midscale for bipolar display)
 let ch1ZeroCode = 2047;
