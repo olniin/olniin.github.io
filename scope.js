@@ -26,6 +26,29 @@ let collecting = false;
 let payload = [];
 let markerBuf = []; // holds bytes that may belong to marker
 
+
+// ===== SCOPE DISPLAY CONSTANTS =====
+const ADC_MAX = 4095;
+const VREF = 3.3;          // set to your ADC reference / frontend scaling
+const H_DIVS = 10;         // horizontal divisions
+const V_DIVS = 8;          // vertical divisions
+
+// If you interpolate with upFactor=4 before plotting:
+const INTERP_UP = 4;
+
+// Set this to your real sample rate (before interpolation).
+// From your earlier setup, you mentioned TIM3 ~ 500 kHz triggering ADC:
+let sampleRateHz = 500000;
+
+// 0V reference as ADC code (midscale for bipolar display)
+let ch1ZeroCode = 2047;
+let ch2ZeroCode = 2047;
+
+// cached UI scales (updated from selects)
+let timeMsPerDiv = 10;
+let ch1mVPerDiv = 250;
+let ch2mVPerDiv = 250;
+
 /* CHECK BROWSER SUPPORT ----------------------------------------------------------------------- */
 //if (!('serial' in navigator)) {
 //    alert('Web Serial API is not supported in this browser. Please use Chrome, Edge, or Opera.');
@@ -40,7 +63,7 @@ let markerBuf = []; // holds bytes that may belong to marker
  */
 function showTimeoutWarning(show)
 {
-  const element = document.getElementById('connTimeout'); // TODO: ADD THIS ELEMENT
+  const element = document.getElementById('connTimeout');
   if(element) element.style.display = show ? 'inline' : 'none';
 }
 
@@ -61,7 +84,7 @@ function forceDisconnect()
  */
 async function toggleConnection()
 {
-  const btn = document.getElementById('connectBtn');  //TODO: ADD "CONNECT BUTTON" IN HTML
+  const btn = document.getElementById('connectBtn');
   if (!isConnected) {
     flushReceiveBuffer();
     try{
@@ -390,87 +413,196 @@ const ch2Interp = sincInterpolate(ch2f, 4);
 plotFrame(ch1Interp, ch2Interp);
 }
 
+function drawGrid(ctx, padding, w, h)
+{
+  const x0 = padding;
+  const y0 = padding;
+  const x1 = padding + w;
+  const y1 = padding + h;
+
+  const pxPerDivX = w / H_DIVS;
+  const pxPerDivY = h / V_DIVS;
+
+  // theme-friendly grid colours
+  const isLight = document.body.classList.contains('light');
+  const major = isLight ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.14)';
+  const centre = isLight ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.30)';
+
+  ctx.save();
+  ctx.lineWidth = 1;
+
+  // vertical major lines
+  ctx.strokeStyle = major;
+  for (let i = 0; i <= H_DIVS; i++) {
+    const x = x0 + i * pxPerDivX;
+    ctx.beginPath();
+    ctx.moveTo(x, y0);
+    ctx.lineTo(x, y1);
+    ctx.stroke();
+  }
+
+  // horizontal major lines
+  for (let j = 0; j <= V_DIVS; j++) {
+    const y = y0 + j * pxPerDivY;
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    ctx.lineTo(x1, y);
+    ctx.stroke();
+  }
+
+  // centre (0V) line: stronger
+  const yCentre = y0 + h / 2;
+  ctx.strokeStyle = centre;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([8, 6]);
+  ctx.beginPath();
+  ctx.moveTo(x0, yCentre);
+  ctx.lineTo(x1, yCentre);
+  ctx.stroke();
+
+  // label "0V"
+  ctx.setLineDash([]);
+  ctx.fillStyle = centre;
+  ctx.font = '11px Courier New';
+  ctx.fillText('0V', x0 + 6, yCentre - 6);
+
+  ctx.restore();
+}
+
+function codeToVolts(code, zeroCode)
+{
+  const voltsPerCode = VREF / ADC_MAX;
+  return (code - zeroCode) * voltsPerCode;
+}
+
+function voltsToCanvasY(volts, voltsPerDiv, padding, h)
+{
+  const yCentre = padding + h / 2;
+  const pxPerDivY = h / V_DIVS;
+
+  // positive volts go UP on a scope -> subtract
+  return yCentre - (volts / voltsPerDiv) * pxPerDivY;
+}
+
 /**
  * Test canvas function.
  */
 function plotFrame(data1, data2)
 {
   if (!isRunning) return;
-  //const data = [10, 40, 25, 60, 80, 30, 50, 90, 70];
-  const canvas = document.getElementById("screen");
+
+  const canvas = document.getElementById('screen');
   const ctx = canvas.getContext('2d');
 
   const padding = 10;
-  const w = canvas.width - 2 * padding;
+  const w = canvas.width  - 2 * padding;
   const h = canvas.height - 2 * padding;
 
-  // min & max from ADC:
-  const maxVal = 4095;
-  const minVal = 0;
-  const n = Math.min(data1.length, data2.length);
-  const xStep = w / (n - 1);
+  // refresh cached selector values (cheap; or rely on event listeners)
+  updateScopesScales();
 
+  // effective rate if you're plotting interpolated arrays
+  const effectiveRateHz = sampleRateHz * INTERP_UP;
+
+  // how many samples should fill the screen based on time/div?
+  const timePerDivSec = (timeMsPerDiv / 1000);
+  const samplesPerDiv = effectiveRateHz * timePerDivSec;
+  const targetSamples = Math.max(16, Math.floor(samplesPerDiv * H_DIVS));
+
+  // choose a window from the end of the arrays (like a live scope)
+  const nAvail = Math.min(data1.length, data2.length);
+  const windowLen = Math.min(nAvail, targetSamples);
+  if (windowLen < 2) return;
+
+  const start = nAvail - windowLen;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // trigger level
-  const trig = Math.min(maxVal, Math.max(minVal, triggerLevel));
-  const yTrig = padding + h - ((trig - minVal) / (maxVal - minVal)) * h;
+  // ===== grid + centre line =====
+  drawGrid(ctx, padding, w, h);
 
-  ctx.save();
-  ctx.strokeStyle = '#226a87';
-  ctx.lineWidth = 1;
+  // volts/div for each channel
+  const ch1VoltsPerDiv = ch1mVPerDiv / 1000;
+  const ch2VoltsPerDiv = ch2mVPerDiv / 1000;
 
-  ctx.beginPath();
-  ctx.moveTo(padding, yTrig);
-  ctx.lineTo(padding + w, yTrig);
-  ctx.stroke();
+  // ===== trigger line (mapped like CH1) =====
+  {
+    const trigVolts = codeToVolts(triggerLevel, ch1ZeroCode);
+    let yTrig = voltsToCanvasY(trigVolts, ch1VoltsPerDiv, padding, h);
 
-  // optional label
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#226a87';
-  ctx.font = '11px Courier New';
-  ctx.fillText('TRIG', padding + 5, yTrig - 4);
+    // clamp to plot area
+    yTrig = Math.max(padding, Math.min(padding + h, yTrig));
 
-  ctx.restore();
+    ctx.save();
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = '#226a87';
+    ctx.lineWidth = 1;
 
-  // wave data
-  ctx.beginPath();
-  ctx.strokeStyle = '#94b1ff';
-  ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padding, yTrig);
+    ctx.lineTo(padding + w, yTrig);
+    ctx.stroke();
 
-  data1.forEach((value, index) => {
-    const x = padding + index * xStep;
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#226a87';
+    ctx.font = '11px Courier New';
+    ctx.fillText('TRIG', padding + 5, yTrig - 4);
+    ctx.restore();
+  }
 
-    // Invert Y-axis for canvas coordinates
-    const y = padding + h - ((value - minVal) / (maxVal - minVal)) * h;
+  // ===== draw CH1 =====
+  {
+    ctx.save();
+    ctx.beginPath();
+    ctx.strokeStyle = '#94b1ff';
+    ctx.lineWidth = 2;
 
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
+    const xStep = w / (windowLen - 1);
+
+    for (let i = 0; i < windowLen; i++) {
+      const x = padding + i * xStep;
+
+      // data1 is interpolated float array of ADC codes; it may overshoot a bit
+      const code = Math.max(0, Math.min(ADC_MAX, data1[start + i]));
+      const volts = codeToVolts(code, ch1ZeroCode);
+      let y = voltsToCanvasY(volts, ch1VoltsPerDiv, padding, h);
+
+      // clamp
+      y = Math.max(padding, Math.min(padding + h, y));
+
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
-  });
-  
-  ctx.stroke();
 
-  ctx.beginPath();
-  ctx.strokeStyle = '#ff6600';
-  ctx.lineWidth = 2;
-  data2.forEach((value, index) => {
-    const x = padding + index * xStep;
+    ctx.stroke();
+    ctx.restore();
+  }
 
-    // Invert Y-axis for canvas coordinates
-    const y = padding + h - ((value - minVal) / (maxVal - minVal)) * h;
+  // ===== draw CH2 =====
+  {
+    ctx.save();
+    ctx.beginPath();
+    ctx.strokeStyle = '#ff6600';
+    ctx.lineWidth = 2;
 
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
+    const xStep = w / (windowLen - 1);
+
+    for (let i = 0; i < windowLen; i++) {
+      const x = padding + i * xStep;
+
+      const code = Math.max(0, Math.min(ADC_MAX, data2[start + i]));
+      const volts = codeToVolts(code, ch2ZeroCode);
+      let y = voltsToCanvasY(volts, ch2VoltsPerDiv, padding, h);
+
+      y = Math.max(padding, Math.min(padding + h, y));
+
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
-  });
 
-  ctx.stroke();
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function updateTrigger()
@@ -480,6 +612,16 @@ function updateTrigger()
   triggerLevel = Number(slider.value) >>> 0;
 }
 
+function updateScopesScales()
+{
+  const tSel  = document.getElementById('time-scale');
+  const c1Sel = document.getElementById('ch1-scale');
+  const c2Sel = document.getElementById('ch2-scale');
+
+  if (tSel)  timeMsPerDiv = Number(tSel.value);      // your options are in ms/div (e.g. 0.6 = 0.6 ms = 600 µs)
+  if (c1Sel) ch1mVPerDiv  = Number(c1Sel.value);     // mV/div
+  if (c2Sel) ch2mVPerDiv  = Number(c2Sel.value);     // mV/div
+}
 
 /**
  * Update status indicator.
@@ -526,3 +668,12 @@ function toggleTheme()
 try {
   if (localStorage.getItem('ISCscope-theme') === 'light') toggleTheme();
 } catch(e) {}
+
+
+window.addEventListener('DOMContentLoaded', () => {
+  updateScopesScales();
+
+  document.getElementById('time-scale')?.addEventListener('change', updateScopesScales);
+  document.getElementById('ch1-scale')?.addEventListener('change', updateScopesScales);
+  document.getElementById('ch2-scale')?.addEventListener('change', updateScopesScales);
+});
