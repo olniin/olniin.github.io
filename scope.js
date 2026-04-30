@@ -507,7 +507,7 @@ function plotFrame(data1, data2)
   // how many samples should fill the screen based on time/div?
   const timePerDivSec = (timeMsPerDiv / 1000);
   const samplesPerDiv = effectiveRateHz * timePerDivSec;
-  const targetSamples = Math.max(16, Math.floor(samplesPerDiv * H_DIVS));
+  const targetSamples = Math.floor(samplesPerDiv * H_DIVS);
 
   // choose a window from the end of the arrays (like a live scope)
   const nAvail = Math.min(data1.length, data2.length);
