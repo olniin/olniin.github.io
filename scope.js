@@ -558,15 +558,15 @@ function plotFrame(data1, data2)
     ctx.lineWidth = 2;
 
     
-    const totalTimeSec = timePerDivSec * H_DIVS;
-    const xStep = w / (totalTimeSec * effectiveRateHz);
+    const targetSamples = Math.floor(samplesPerDiv * H_DIVS);
+    const windowLen = Math.min(nAvail, targetSamples);
+
+    // NEW: stretch data horizontally instead of changing window
+    const xStep = w / (samplesPerDiv * H_DIVS);
 
 
     for (let i = 0; i < windowLen; i++) {
-      
-      const timeSec = i / effectiveRateHz;
-      const x = padding + timeSec / totalTimeSec * w;
-
+      const x = padding + i * xStep;
 
       // data1 is interpolated float array of ADC codes; it may overshoot a bit
       const code = Math.max(0, Math.min(ADC_MAX, data1[start + i]));
@@ -592,15 +592,15 @@ function plotFrame(data1, data2)
     ctx.lineWidth = 2;
 
     
-    const totalTimeSec = timePerDivSec * H_DIVS;
-    const xStep = w / (totalTimeSec * effectiveRateHz);
+    const targetSamples = Math.floor(samplesPerDiv * H_DIVS);
+    const windowLen = Math.min(nAvail, targetSamples);
+
+    // NEW: stretch data horizontally instead of changing window
+    const xStep = w / (samplesPerDiv * H_DIVS);
 
 
     for (let i = 0; i < windowLen; i++) {
-      
-      const timeSec = i / effectiveRateHz;
-      const x = padding + timeSec / totalTimeSec * w;
-
+      const x = padding + i * xStep;
 
       const code = Math.max(0, Math.min(ADC_MAX, data2[start + i]));
       const volts = codeToVolts(code, ch2ZeroCode);
