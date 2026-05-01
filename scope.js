@@ -491,6 +491,20 @@ function plotFrame(data1, data2)
 {
   if (!isRunning) return;
 
+  const inputFreq = document.getElementById('gen-freq');
+  const freq = Number.parseInt(inputFreq?.value ?? '0', 10) >>> 0;
+  
+  // sample rate adjustment
+  if (freq <= 1000) {
+		sampleRateHz = 10000;
+	} else if (freq <= 5000) {
+		sampleRateHz = 50000;
+	} else if (freq <= 10000) {
+		sampleRateHz = 100000;
+	} else {
+		sampleRateHz = 300000;
+	}
+
   const canvas = document.getElementById('screen');
   const ctx = canvas.getContext('2d');
 
@@ -557,13 +571,7 @@ function plotFrame(data1, data2)
     ctx.strokeStyle = '#94b1ff';
     ctx.lineWidth = 2;
 
-    
-    const targetSamples = Math.floor(samplesPerDiv * H_DIVS);
-    const windowLen = Math.min(nAvail, targetSamples);
-
-    // NEW: stretch data horizontally instead of changing window
-    const xStep = w / (samplesPerDiv * H_DIVS);
-
+    const xStep = w / (windowLen - 1);
 
     for (let i = 0; i < windowLen; i++) {
       const x = padding + i * xStep;
@@ -591,13 +599,7 @@ function plotFrame(data1, data2)
     ctx.strokeStyle = '#ff6600';
     ctx.lineWidth = 2;
 
-    
-    const targetSamples = Math.floor(samplesPerDiv * H_DIVS);
-    const windowLen = Math.min(nAvail, targetSamples);
-
-    // NEW: stretch data horizontally instead of changing window
-    const xStep = w / (samplesPerDiv * H_DIVS);
-
+    const xStep = w / (windowLen - 1);
 
     for (let i = 0; i < windowLen; i++) {
       const x = padding + i * xStep;
