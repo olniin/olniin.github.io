@@ -302,6 +302,17 @@ async function sendHex()
   // clamp input frequency
   const freqClamped = Math.min(Math.max(freq, 10), 50000) >>> 0;
 
+  // sample rate adjustment
+  if (freq <= 1000) {
+		sampleRateHz = 10000;
+	} else if (freq <= 5000) {
+		sampleRateHz = 50000;
+	} else if (freq <= 10000) {
+		sampleRateHz = 100000;
+	} else {
+		sampleRateHz = 300000;
+	}
+
   const mode = ((type & 0x03) << 2) | (attn & 0x03);
 
   const data = new Uint8Array([
@@ -490,20 +501,6 @@ function voltsToCanvasY(volts, voltsPerDiv, padding, h)
 function plotFrame(data1, data2)
 {
   if (!isRunning) return;
-
-  const inputFreq = document.getElementById('gen-freq');
-  const freq = Number.parseInt(inputFreq?.value ?? '0', 10) >>> 0;
-  
-  // sample rate adjustment
-  if (freq <= 1000) {
-		sampleRateHz = 10000;
-	} else if (freq <= 5000) {
-		sampleRateHz = 50000;
-	} else if (freq <= 10000) {
-		sampleRateHz = 100000;
-	} else {
-		sampleRateHz = 300000;
-	}
 
   const canvas = document.getElementById('screen');
   const ctx = canvas.getContext('2d');
