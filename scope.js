@@ -338,7 +338,7 @@ function parseBuffer()
     const payloadStart = readPos + HEADER_SIZE;
     const payloadEnd   = endPos;
     const payloadLen   = payloadEnd - payloadStart;
-    
+
     console.log("PayloadLen:", payloadLen);
     // ===== VALIDATE SIZE =====
     if (payloadLen <= 0 || (payloadLen % 4 !== 0)) {
@@ -364,12 +364,12 @@ function parseBuffer()
       frameBuffer[tempIndex++] = val2;
     }
 
-    if (ch1_sum !== sum1 || ch2_sum !== sum2) {
-      console.log("Checksum FAIL", ch1_sum, sum1, ch2_sum, sum2);
-      frameIndex = 0;
-      readPos++;
-      continue;
-    }
+    //if (ch1_sum !== sum1 || ch2_sum !== sum2) {
+    //  console.log("Checksum FAIL", ch1_sum, sum1, ch2_sum, sum2);
+    //  frameIndex = 0;
+    //  readPos++;
+    //  continue;
+    //}
 
     // commit only if valid
     frameIndex = tempIndex;
