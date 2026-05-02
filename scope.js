@@ -282,13 +282,14 @@ function processReceivedData(data)
                       (rxBuffer[12] << 8) |
                       (rxBuffer[13]);
     const payloadLen = (rxBuffer[14] << 8) | (rxBuffer[15]);
+    console.log(payloadLen);
     const packetSize = usbHeaderSize + payloadLen;
 
     // packet not full
     if (rxBuffer.length < packetSize) return;
 
     // extract payload
-    const payload = rxBuffer.slice(16, 16 + payloadLen-4);
+    const payload = rxBuffer.slice(16, 16 + payloadLen);
 
     // start a new frame if packet index is 0
     if (packetIndex === 0) {
