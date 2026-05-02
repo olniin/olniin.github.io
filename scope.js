@@ -360,7 +360,69 @@ function divideDataIntoChannels(frameBuf) {
 
   // Pass to next stage (renderer / processing)
   //handleChannels(ch1, ch2);
+  const canvas = document.getElementById('screen');
+  const ctx = canvas.getContext('2d');
+  drawGrid(ctx, 10, 1200, 720);
 }
+
+/* SCOPE DRAWING FUNCTIONS --------------------------------------------------------------------- */
+
+/**
+ * Draw the oscilloscope background grid.
+ *
+ * @param {*} ctx
+ * @param {*} padding
+ * @param {*} width
+ * @param {*} height
+ */
+function drawGrid(ctx, padding, width, height) {
+  const xDivs = 10;
+  const yDivs = 8;
+  const drawWidth = width - 2 * padding;
+  const drawHeight = height - 2 * padding;
+  const xStep = drawWidth / xDivs;
+  const yStep = drawHeight / yDivs;
+
+  ctx.save();
+
+  // clear background
+  ctx.fillStyle = isLightTheme ? '#FFFFFF' : '#000000';
+  ctx.fillRect(0, 0, width, height);
+  
+  // grid style depending on theme
+  ctx.strokeStyle = isLightTheme ? '#BABABA' : '#404040';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  // vertical lines
+  for (let i=0; i<=xDivs; i++) {
+    const x = padding + i*xStep;
+    ctx.moveTo(x, padding);
+    ctx.lineTo(x, height-padding);
+  }
+  // horizontal lines
+  for (let i=0; i<=yDivs; i++) {
+    const y = padding + i*yStep;
+    ctx.moveTo(padding, y);
+    ctx.lineTo(width-padding, y);
+  }
+  ctx.stroke();
+
+  // horizontal centre
+  ctx.strokeStyle = isLightTheme ? '#404040' : '#BABABA';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  const centerY = padding + drawHeight / 2;
+  ctx.moveTo(padding, centerY);
+  ctx.lineTo(width-padding, centerY);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+
+
+
+
 
 
 
@@ -444,288 +506,6 @@ function toggleStop()
   btn.textContent = isRunning ? 'STOP' : 'RUN';
 }
 
-
-function sinc(x)
-{
-  if (x === 0) return 1;
-  const px = Math.PI * x;
-  return Math.sin(px) / px;
-}
-
-function hamming(n, N)
-{
-  return 0.54 - 0.46 * Math.cos((2 * Math.PI * n) / (N - 1));
-}
-
-function sincInterpolate(input, upFactor = 4, radius = 8)
-{
-  const inLen = input.length;
-  const outLen = inLen * upFactor;
-  const output = new Float32Array(outLen);
-
-  const kernelSize = radius * 2 + 1;
-
-  for (let i = 0; i < outLen; i++) {
-    const t = i / upFactor;
-    const idx = Math.floor(t);
-
-    let sum = 0;
-    let norm = 0;
-
-    for (let k = -radius; k <= radius; k++) {
-      const n = idx + k;
-      if (n < 0 || n >= inLen) continue;
-
-      const x = t - n;
-      const w = hamming(k + radius, kernelSize);
-      const s = sinc(x) * w;
-
-      sum += input[n] * s;
-      norm += s;
-    }
-
-    output[i] = norm !== 0 ? sum / norm : 0;
-  }
-
-  return output;
-}
-
-
-function handleFrame(frame)
-{
-  if (frame.length < 4) return;
-
-  const sampleCount = frame.length / 2;
-  const ch1 = new Uint16Array(sampleCount);
-  const ch2 = new Uint16Array(sampleCount);
-
-  for (let i = 0; i < sampleCount; i++) {
-    ch1[i] = frame[2*i];
-    ch2[i] = frame[2*i + 1];
-  }
-
-  const ch1f = Float32Array.from(ch1);
-  const ch2f = Float32Array.from(ch2);
-
-  const ch1Interp = sincInterpolate(ch1f, 4);
-  const ch2Interp = sincInterpolate(ch2f, 4);
-
-  plotFrame(ch1Interp, ch2Interp);
-}
-
-
-function drawGrid(ctx, padding, w, h)
-{
-  const x0 = padding;
-  const y0 = padding;
-  const x1 = padding + w;
-  const y1 = padding + h;
-
-  const pxPerDivX = w / H_DIVS;
-  const pxPerDivY = h / V_DIVS;
-
-  // theme-friendly grid colours
-  const isLight = document.body.classList.contains('light');
-  const major = isLight ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.14)';
-  const centre = isLight ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.30)';
-
-  ctx.save();
-  ctx.lineWidth = 1;
-
-  // vertical major lines
-  ctx.strokeStyle = major;
-  for (let i = 0; i <= H_DIVS; i++) {
-    const x = x0 + i * pxPerDivX;
-    ctx.beginPath();
-    ctx.moveTo(x, y0);
-    ctx.lineTo(x, y1);
-    ctx.stroke();
-  }
-
-  // horizontal major lines
-  for (let j = 0; j <= V_DIVS; j++) {
-    const y = y0 + j * pxPerDivY;
-    ctx.beginPath();
-    ctx.moveTo(x0, y);
-    ctx.lineTo(x1, y);
-    ctx.stroke();
-  }
-
-  // centre (0V) line: stronger
-  const yCentre = y0 + h / 2;
-  ctx.strokeStyle = centre;
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([8, 6]);
-  ctx.beginPath();
-  ctx.moveTo(x0, yCentre);
-  ctx.lineTo(x1, yCentre);
-  ctx.stroke();
-
-  // label "0V"
-  ctx.setLineDash([]);
-  ctx.fillStyle = centre;
-  ctx.font = '11px Courier New';
-  ctx.fillText('0V', x0 + 6, yCentre - 6);
-
-  ctx.restore();
-}
-
-function codeToVolts(code, zeroCode, gain=3)
-{
-  const voltsPerCode = VREF / ADC_MAX;
-  return (code - zeroCode) * voltsPerCode * gain;
-}
-
-function voltsToCanvasY(volts, voltsPerDiv, padding, h)
-{
-  const yCentre = padding + h / 2;
-  const pxPerDivY = h / V_DIVS;
-
-  // positive volts go UP on a scope -> subtract
-  return yCentre - (volts / voltsPerDiv) * pxPerDivY;
-}
-
-/**
- * Test canvas function.
- */
-function plotFrame(data1, data2)
-{
-  if (!isRunning) return;
-
-  const canvas = document.getElementById('screen');
-  const ctx = canvas.getContext('2d');
-
-  const padding = 10;
-  const w = canvas.width  - 2 * padding;
-  const h = canvas.height - 2 * padding;
-
-  // refresh cached selector values (cheap; or rely on event listeners)
-  updateScopesScales();
-
-  // effective rate if you're plotting interpolated arrays
-  const effectiveRateHz = sampleRateHz * INTERP_UP;
-
-  const totalTimeSec  = (timeMsPerDiv / 1000) * H_DIVS;
-  const targetSamples = Math.max(16, Math.floor(effectiveRateHz * totalTimeSec));
-  const nAvail        = Math.min(data1.length, data2.length);
-  const windowLen     = Math.min(nAvail, targetSamples);
-  const start         = nAvail - windowLen;
-  const saturated     = targetSamples > nAvail; // not enough samples for chosen timebase
-  const xScale = w / (totalTimeSec * effectiveRateHz);
-  if (windowLen < 2) return;
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // ===== grid + centre line =====
-  drawGrid(ctx, padding, w, h);
-
-  // volts/div for each channel
-  const ch1VoltsPerDiv = ch1mVPerDiv / 1000;
-  const ch2VoltsPerDiv = ch2mVPerDiv / 1000;
-
-  // ===== trigger line (mapped like CH1) =====
-  {
-    const trigVolts = codeToVolts(triggerLevel, ch1ZeroCode);
-    let yTrig = voltsToCanvasY(trigVolts, ch1VoltsPerDiv, padding, h);
-
-    // clamp to plot area
-    yTrig = Math.max(padding, Math.min(padding + h, yTrig));
-
-    ctx.save();
-    ctx.setLineDash([6, 4]);
-    ctx.strokeStyle = '#226a87';
-    ctx.lineWidth = 1;
-
-    ctx.beginPath();
-    ctx.moveTo(padding, yTrig);
-    ctx.lineTo(padding + w, yTrig);
-    ctx.stroke();
-
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#226a87';
-    ctx.font = '11px Courier New';
-    ctx.fillText('TRIG', padding + 5, yTrig - 4);
-    ctx.restore();
-  }
-
-  // saturated
-  if (saturated) {
-    ctx.save();
-    ctx.fillStyle = 'rgba(255,80,80,0.9)';
-    ctx.font = '12px Courier New';
-    ctx.fillText('TIMEBASE LIMITED BY RECORD LENGTH', padding + 10, padding + 20);
-    ctx.restore();
-  }
-
-  // ===== draw CH1 =====
-  {
-    ctx.save();
-    ctx.beginPath();
-    ctx.strokeStyle = '#94b1ff';
-    ctx.lineWidth = 2;
-
-    for (let i = 0; i < windowLen; i++) {
-      const x = padding + i * xScale;
-
-      // data1 is interpolated float array of ADC codes; it may overshoot a bit
-      const code = Math.max(0, Math.min(ADC_MAX, data1[start + i]));
-      const volts = codeToVolts(code, ch1ZeroCode);
-      let y = voltsToCanvasY(volts, ch1VoltsPerDiv, padding, h);
-
-      // clamp
-      y = Math.max(padding, Math.min(padding + h, y));
-
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // ===== draw CH2 =====
-  {
-    ctx.save();
-    ctx.beginPath();
-    ctx.strokeStyle = '#ff6600';
-    ctx.lineWidth = 2;
-
-    for (let i = 0; i < windowLen; i++) {
-      const x = padding + i * xScale;
-
-      const code = Math.max(0, Math.min(ADC_MAX, data2[start + i]));
-      const volts = codeToVolts(code, ch2ZeroCode);
-      let y = voltsToCanvasY(volts, ch2VoltsPerDiv, padding, h);
-
-      y = Math.max(padding, Math.min(padding + h, y));
-
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-
-    ctx.stroke();
-    ctx.restore();
-  }
-}
-
-function updateTrigger()
-{
-  const slider = document.getElementById('gen-trig');
-  if (!slider) return;
-  triggerLevel = Number(slider.value) >>> 0;
-}
-
-function updateScopesScales()
-{
-  const tSel  = document.getElementById('time-scale');
-  const c1Sel = document.getElementById('ch1-scale');
-  const c2Sel = document.getElementById('ch2-scale');
-
-  if (tSel)  timeMsPerDiv = Number(tSel.value);      // your options are in ms/div (e.g. 0.6 = 0.6 ms = 600 µs)
-  if (c1Sel) ch1mVPerDiv  = Number(c1Sel.value);     // mV/div
-  if (c2Sel) ch2mVPerDiv  = Number(c2Sel.value);     // mV/div
-}
-
 /**
  * Update status indicator.
  *
@@ -766,17 +546,3 @@ function toggleTheme()
   // refresh connection status colors immediately
   updateStatus(isConnected);
 }
-
-// restore saved theme on load
-try {
-  if (localStorage.getItem('ISCscope-theme') === 'light') toggleTheme();
-} catch(e) {}
-
-
-window.addEventListener('DOMContentLoaded', () => {
-  updateScopesScales();
-
-  document.getElementById('time-scale')?.addEventListener('change', updateScopesScales);
-  document.getElementById('ch1-scale')?.addEventListener('change', updateScopesScales);
-  document.getElementById('ch2-scale')?.addEventListener('change', updateScopesScales);
-});
