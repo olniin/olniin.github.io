@@ -395,9 +395,9 @@ function updateScopeScales()
 window.addEventListener('DOMContentLoaded', () => {
   updateScopeScales();
 
-  document.getElementById('time-scale')?.addEventListener('change', updateScopeScales());
-  document.getElementById('ch1-scale')?.addEventListener('change', updateScopeScales());
-  document.getElementById('ch2-scale')?.addEventListener('change', updateScopeScales());
+  document.getElementById('time-scale')?.addEventListener('change', updateScopeScales);
+  document.getElementById('ch1-scale')?.addEventListener('change', updateScopeScales);
+  document.getElementById('ch2-scale')?.addEventListener('change', updateScopeScales);
 });
 
 
