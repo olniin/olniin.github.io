@@ -386,6 +386,12 @@ function parseBuffer()
       handleFrame(frameBuffer);
       frameIndex = 0;
     }
+
+
+    if (frameIndex > 0 && frameIndex % 100 === 0) {
+      console.log("Frame progress:", frameIndex);
+    }
+
   }
 }
 
