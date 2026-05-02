@@ -373,6 +373,7 @@ function parseBuffer()
 
     // ===== CHECKSUM =====
     if (ch1_sum !== sum1 || ch2_sum !== sum2) {
+      console.log("Checksum FAIL", ch1_sum, sum1, ch2_sum, sum2);
       frameIndex = 0;
       readPos++; // resync safely
       continue;
@@ -525,37 +526,29 @@ function sincInterpolate(input, upFactor = 4, radius = 8)
   return output;
 }
 
-function handleFrame(frameU8)
+
+function handleFrame(frame)
 {
-  // Must contain at least 2 channels (4 bytes)
-  if (frameU8.length < 8) return;
+  if (frame.length < 4) return;
 
-  // Drop first CH1+CH2 sample (ADC warm‑up)
-  let offset = 0;
-
-  let usableLen = frameU8.length - offset;
-  usableLen -= (usableLen % 4);
-  if (usableLen <= 0) return;
-
-  const sampleCount = usableLen / 4;
+  const sampleCount = frame.length / 2;
   const ch1 = new Uint16Array(sampleCount);
   const ch2 = new Uint16Array(sampleCount);
 
   for (let i = 0; i < sampleCount; i++) {
-    const b = offset + i * 4;
-    ch1[i] = (frameU8[b] << 8) | frameU8[b + 1];
-    ch2[i] = (frameU8[b + 2] << 8) | frameU8[b + 3];
+    ch1[i] = frame[2*i];
+    ch2[i] = frame[2*i + 1];
   }
 
-  
-const ch1f = Float32Array.from(ch1);
-const ch2f = Float32Array.from(ch2);
+  const ch1f = Float32Array.from(ch1);
+  const ch2f = Float32Array.from(ch2);
 
-const ch1Interp = sincInterpolate(ch1f, 4);
-const ch2Interp = sincInterpolate(ch2f, 4);
+  const ch1Interp = sincInterpolate(ch1f, 4);
+  const ch2Interp = sincInterpolate(ch2f, 4);
 
-plotFrame(ch1Interp, ch2Interp);
+  plotFrame(ch1Interp, ch2Interp);
 }
+
 
 function drawGrid(ctx, padding, w, h)
 {
