@@ -65,7 +65,7 @@
       <!-- connect -->
       <div class="panel scope-connect">
         <button id="connectBtn" onclick="toggleConnection()">CONNECT</button>
-        <button id="stopBtn" onclick="toggleStop()">STOP</button>
+        <button id="stopBtn" onclick="toggleDisplayUpdate()">STOP</button>
       </div>
       <!-- settings menu -->
       <div class="panel scope-settings">
@@ -89,7 +89,7 @@
         </div>
         <div class="input-group">
           <label>TRIGGER</label>
-          <input type="range" id="gen-trig" value="2047" min="0" step="1" max="4095" oninput="updateTrigger()" onchange="sendHex()">
+          <input type="range" id="gen-trig" value="2047" min="0" step="1" max="4095" oninput="updateTriggerLevel()" onchange="sendHex()">
         </div>
         <div class="input-group">
           <label>TIME SCALE</label>

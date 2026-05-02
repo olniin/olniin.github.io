@@ -288,7 +288,7 @@ function processReceivedData(data)
     if (rxBuffer.length < packetSize) return;
 
     // extract payload
-    const payload = rxBuffer.slice(16, 16 + payloadLen);
+    const payload = rxBuffer.slice(16, 16 + payloadLen-4);
 
     // start a new frame if packet index is 0
     if (packetIndex === 0) {
