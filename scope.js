@@ -18,23 +18,17 @@ const MAX_BUFFER_SIZE = 65536;
 let isRunning = true;
 let triggerLevel = 2047;
 
-// ===== CONSTANTS =====
-const MAGIC0 = 0x69, MAGIC1 = 0xF7, MAGIC2 = 0x69, MAGIC3 = 0xF7;
-const END0 = 0xFF, END1 = 0x00, END2 = 0xFF, END3 = 0x00;
+/* USB PROTOCOL VARIABLES ---------------------------------------------------------------------- */
+const usbMagic = [0x69, 0xF7, 0x69, 0xF7, 0x00];
+const usbHeaderSize = 16;
+const payloadTotalSize = 4096;  // includes only ADC1/2 data as 8b values
 
-const HEADER_SIZE = 12;
-const FRAME_SIZE = 2048;
-const MAX_PACKET_SIZE = HEADER_SIZE + 1008 + 4;
+/* FRAME STATE VARIABLES ----------------------------------------------------------------------- */
+let rxBuffer = [];
+let frameBuffer = null;
+let frameOffset = 0;    // no offset by default
+let expectedIndex = 0;  // first index of a frame is 0
 
-// ===== BUFFERS =====
-const BUFFER_SIZE = 65536;
-let buffer = new Uint8Array(BUFFER_SIZE);
-
-let writePos = 0;
-let readPos = 0;
-
-let frameBuffer = new Uint16Array(FRAME_SIZE);
-let frameIndex = 0;
 
 
 
@@ -239,168 +233,118 @@ function flushReceiveBuffer()
   receiveBuffer = [];
 }
 
+/* DATA PROCESSING FUNCTIONS ------------------------------------------------------------------- */
+
+/**
+ * Find MAGIC header from USB buffer.
+ *
+ * @param {Array} buffer data in buffer
+ * @returns index of first MAGIC byte or -1 if not found
+ */
+function findMagic(buffer)
+{
+  for (let i=0; i<=buffer.length-5; i++) {
+    let match = true;
+    for (let j=0; j<5; j++) {
+      if (buffer[i + j] !== usbMagic[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return i;
+  }
+  return -1;
+}
 
 /**
  * Process received data.
  *
- * @param {Uint8Array} data - data array to be processed
+ * @param {Uint8Array} data incoming data as uint8 values
+ * @returns null
  */
+function processReceivedData(data) {
+  rxBuffer.push(...data); // incoming data chuncks are appended to rolling buffer
 
-function processReceivedData(data)
-{
-  // append data
-  if (writePos + data.length >= BUFFER_SIZE) {
-    compactBuffer();
-  }
+  while (true) {
+    if (rxBuffer.length < usbHeaderSize) return;  // header won't fit
 
-  buffer.set(data, writePos);
-  writePos += data.length;
-
-  parseBuffer();
-}
-
-
-// ===== PARSER =====
-function parseBuffer()
-{
-  while (true)
-  {
-    // need at least header
-    if (writePos - readPos < HEADER_SIZE) return;
-
-    // ===== FIND MAGIC =====
-    let found = false;
-
-    while (readPos <= writePos - 4)
-    {
-      if (
-        buffer[readPos]     === MAGIC0 &&
-        buffer[readPos + 1] === MAGIC1 &&
-        buffer[readPos + 2] === MAGIC2 &&
-        buffer[readPos + 3] === MAGIC3
-      ) {
-        found = true;
-        break;
-      }
-      readPos++;
-    }
-
-    if (!found) {
-      // keep last 3 bytes for partial match
-      readPos = Math.max(writePos - 3, 0);
+    // find magic bytes from the buffer
+    let magicIndex = findMagic(rxBuffer);
+    if (magicIndex === -1) {  // no magic match, keep last 4 bytes
+      rxBuffer = rxBuffer.slice(-4);
       return;
     }
+    // if magic bytes are not the first in the array discard bytes til magic
+    if (magicIndex > 0) {
+      rxBuffer = rxBuffer.slice(magicIndex);
+    }
+    // magic is the first in the buffer, but header is incomplete
+    if (rxBuffer.length < usbHeaderSize) return;
 
-    // need full header
-    if (writePos - readPos < HEADER_SIZE) return;
+    // parse header
+    const packetIndex = rxBuffer[5];
+    const ctrlSum1 = (rxBuffer[6] << 24) |
+                      (rxBuffer[7] << 16) |
+                      (rxBuffer[8] << 8) |
+                      (rxBuffer[9]);
+    const ctrlSum2 = (rxBuffer[10] << 24) |
+                      (rxBuffer[11] << 16) |
+                      (rxBuffer[12] << 8) |
+                      (rxBuffer[13]);
+    const payloadLen = (rxBuffer[14] << 8) | (rxBuffer[15]);
+    const packetSize = usbHeaderSize + payloadLen;
 
-    // ===== READ CHECKSUMS (UNSIGNED) =====
-    const sum1 =
-      (
-        (buffer[readPos+4] << 24) |
-        (buffer[readPos+5] << 16) |
-        (buffer[readPos+6] << 8)  |
-        buffer[readPos+7]
-      ) >>> 0;
+    // packet not full
+    if (rxBuffer.length < packetSize) return;
 
-    const sum2 =
-      (
-        (buffer[readPos+8]  << 24) |
-        (buffer[readPos+9]  << 16) |
-        (buffer[readPos+10] << 8)  |
-        buffer[readPos+11]
-      ) >>> 0;
+    // extract payload
+    const payload = rxBuffer.slice(16, 16 + payloadLen);
 
-    // ===== FIND END =====
-    
-    const MAX_PAYLOAD = 1008;
-    const MAX_PACKET = HEADER_SIZE + MAX_PAYLOAD + 4;
+    // start a new frame if packet index is 0
+    if (packetIndex === 0) {
+      frameBuffer = new Uint8Array(payloadTotalSize);
+      frameOffset = 0;
+      expectedIndex = 0;
+    }
 
-    let endPos = -1;
+    if (frameBuffer && packetIndex === expectedIndex) {
+      frameBuffer.set(payload, frameOffset);
+      frameOffset += payloadLen;
+      expectedIndex++;
 
-    const searchEnd = Math.min(writePos - 4, readPos + MAX_PACKET);
-
-    for (let i = readPos + HEADER_SIZE; i <= searchEnd; i++)
-    {
-      if (
-        buffer[i]     === END0 &&
-        buffer[i + 1] === END1 &&
-        buffer[i + 2] === END2 &&
-        buffer[i + 3] === END3
-      ) {
-        endPos = i;
-        break;
+      if (expectedIndex === 5) {  // frame complete
+        if (frameOffset === FRAME_TOTAL_SIZE) {
+          //divideDataIntoChannels(frameBuffer);
+          console.log(frameBuffer);
+        } else {
+          console.warn("Frame size mismatch:", frameOffset);
+        }
+        // reset index for the next frame
+        frameBuffer = null;
+        expectedIndex = 0;
+        frameOffset = 0;
       }
+    } else {  // reset out of sync frame
+      frameBuffer = null;
+      expectedIndex = 0;
+      frameOffset = 0;
+      console.warn("Frame out of sync!");
     }
 
-    if (endPos === -1) return; // wait for more data
-
-    const payloadStart = readPos + HEADER_SIZE;
-    const payloadEnd   = endPos;
-    const payloadLen   = payloadEnd - payloadStart;
-
-    console.log("PayloadLen:", payloadLen);
-    // ===== VALIDATE SIZE =====
-    if (payloadLen <= 0 || (payloadLen % 4 !== 0)) {
-      readPos++; // resync
-      continue;
-    }
-
-    // ===== PARSE PAYLOAD =====
-    let ch1_sum = 0;
-    let ch2_sum = 0;
-
-    let tempIndex = frameIndex;
-
-    for (let i = payloadStart; i < payloadEnd; i += 4)
-    {
-      const val1 = (buffer[i] << 8) | buffer[i+1];
-      const val2 = (buffer[i+2] << 8) | buffer[i+3];
-
-      ch1_sum = (ch1_sum + val1) >>> 0;
-      ch2_sum = (ch2_sum + val2) >>> 0;
-
-      frameBuffer[tempIndex++] = val1;
-      frameBuffer[tempIndex++] = val2;
-    }
-
-    //if (ch1_sum !== sum1 || ch2_sum !== sum2) {
-    //  console.log("Checksum FAIL", ch1_sum, sum1, ch2_sum, sum2);
-    //  frameIndex = 0;
-    //  readPos++;
-    //  continue;
-    //}
-
-    // commit only if valid
-    frameIndex = tempIndex;
-
-    // ===== ADVANCE BUFFER =====
-    readPos = endPos + 4;
-
-    // ===== FRAME READY =====
-    if (frameIndex >= FRAME_SIZE) {
-      handleFrame(frameBuffer);
-      frameIndex = 0;
-    }
-
-
-    if (frameIndex > 0 && frameIndex % 100 === 0) {
-      console.log("Frame progress:", frameIndex);
-    }
-
+    // remove processed packet from the ring buffer
+    rxBuffer = rxBuffer.slice(packetSize);
   }
 }
 
 
-// ===== BUFFER COMPACTION =====
-function compactBuffer()
-{
-  if (readPos === 0) return;
 
-  buffer.copyWithin(0, readPos, writePos);
-  writePos -= readPos;
-  readPos = 0;
-}
+
+
+
+
+
+
+
 
 
 
