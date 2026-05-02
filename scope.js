@@ -351,9 +351,7 @@ function divideDataIntoChannels(frameBuf)
 
   // Pass to next stage (renderer / processing)
   //handleChannels(ch1, ch2);
-  const canvas = document.getElementById('screen');
-  const ctx = canvas.getContext('2d');
-  drawGrid(ctx, 10, 1200, 720);
+  plotFrame(ch1Values, ch2Values);
 }
 
 /* SCOPE DRAWING FUNCTIONS --------------------------------------------------------------------- */
