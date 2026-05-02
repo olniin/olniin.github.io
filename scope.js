@@ -19,12 +19,13 @@ let isRunning = true;
 let triggerLevel = 2047;
 
 // data
-const MARKER = Uint8Array.from([0x0F, 0xA6, 0x0F, 0xA6, 0x0F, 0xA6]);
+const MAGIC = [0x69, 0xF7, 0x69, 0xF7];
+const END = [0xFF, 0x00, 0xFF, 0x00];
 
-let markerIndex = 0;
-let collecting = false;
-let payload = [];
-let markerBuf = []; // holds bytes that may belong to marker
+const HEADER_SIZE = 12;
+
+let buffer = [];          // raw byte stream
+let frameBuffer = [];     // collected uint16 values (full frame)
 
 
 // ===== SCOPE DISPLAY CONSTANTS =====
@@ -38,7 +39,7 @@ const INTERP_UP = 4;
 
 // Set this to your real sample rate (before interpolation).
 // From your earlier setup, you mentioned TIM3 ~ 500 kHz triggering ADC:
-let sampleRateHz = 100000;
+let sampleRateHz = 10000;
 
 // 0V reference as ADC code (midscale for bipolar display)
 let ch1ZeroCode = 2047;
@@ -228,6 +229,24 @@ function flushReceiveBuffer()
   receiveBuffer = [];
 }
 
+
+function findSequence(buf, seq, start = 0)
+{
+  for (let i = start; i <= buf.length - seq.length; i++)
+  {
+    let match = true;
+    for (let j = 0; j < seq.length; j++)
+    {
+      if (buf[i + j] !== seq[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return i;
+  }
+  return -1;
+}
+
 /**
  * Process received data.
  *
@@ -236,45 +255,90 @@ function flushReceiveBuffer()
 
 function processReceivedData(data)
 {
-  for (let i = 0; i < data.length; i++) {
-    const byte = data[i];
+  // append incoming data
+  for (let b of data) buffer.push(b);
 
-    if (byte === MARKER[markerIndex]) {
-      markerBuf.push(byte);
-      markerIndex++;
+  while (true)
+  {
+    // 1. find MAGIC
+    let start = findSequence(buffer, MAGIC);
+    if (start === -1) {
+      // keep last few bytes in case MAGIC is split
+      buffer = buffer.slice(-3);
+      return;
+    }
 
-      // full marker detected
-      if (markerIndex === MARKER.length) {
-        markerIndex = 0;
-        markerBuf.length = 0;
+    // discard everything before MAGIC
+    buffer = buffer.slice(start);
 
-        if (collecting) {
-          handleFrame(Uint8Array.from(payload));
-          payload = [];
-        }
+    // need at least header
+    if (buffer.length < HEADER_SIZE) return;
 
-        collecting = true;
-      }
+    // 2. read checksums
+    const sum1 =
+      (buffer[4] << 24) |
+      (buffer[5] << 16) |
+      (buffer[6] << 8) |
+      buffer[7];
 
+    const sum2 =
+      (buffer[8] << 24) |
+      (buffer[9] << 16) |
+      (buffer[10] << 8) |
+      buffer[11];
+
+    // 3. find END flag
+    let endIndex = findSequence(buffer, END, HEADER_SIZE);
+    if (endIndex === -1) {
+      // wait for more data
+      return;
+    }
+
+    // 4. extract payload
+    const payloadStart = HEADER_SIZE;
+    const payloadEnd = endIndex;
+
+    const payloadBytes = buffer.slice(payloadStart, payloadEnd);
+
+    // must be even (uint16)
+    if (payloadBytes.length % 2 !== 0) {
+      console.warn("Invalid payload size");
+      buffer = buffer.slice(endIndex + 4);
       continue;
     }
 
-    // marker match failed
-    if (markerIndex > 0) {
-      // bytes in markerBuf are NOT marker → flush them safely
-      if (collecting) {
-        payload.push(...markerBuf);
-      }
-      markerBuf.length = 0;
-      markerIndex = 0;
+    // 5. convert + checksum
+    let ch1_sum = 0;
+    let ch2_sum = 0;
+
+    for (let i = 0; i < payloadBytes.length; i += 4)
+    {
+      const val1 = (payloadBytes[i] << 8) | payloadBytes[i+1];
+      const val2 = (payloadBytes[i+2] << 8) | payloadBytes[i+3];
+
+      ch1_sum = (ch1_sum + val1) >>> 0;
+      ch2_sum = (ch2_sum + val2) >>> 0;
+
+      frameBuffer.push(val1, val2);
     }
 
-    // normal payload byte
-    if (collecting) {
-      payload.push(byte);
+    // 6. validate checksum
+    if (ch1_sum !== (sum1 >>> 0) || ch2_sum !== (sum2 >>> 0)) {
+      console.warn("Checksum mismatch");
+      frameBuffer = [];
+    }
+
+    // 7. remove processed packet
+    buffer = buffer.slice(endIndex + 4);
+
+    // 8. full frame ready?
+    if (frameBuffer.length >= 2048) {
+      handleFrame(new Uint16Array(frameBuffer.slice(0, 2048)));
+      frameBuffer = [];
     }
   }
 }
+
 
 
 /**
@@ -346,6 +410,7 @@ function toggleStop()
   btn.classList.toggle('active');
   btn.textContent = isRunning ? 'STOP' : 'RUN';
 }
+
 
 function sinc(x)
 {
