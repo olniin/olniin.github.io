@@ -24,6 +24,7 @@ const END0 = 0xFF, END1 = 0x00, END2 = 0xFF, END3 = 0x00;
 
 const HEADER_SIZE = 12;
 const FRAME_SIZE = 2048;
+const MAX_PACKET_SIZE = HEADER_SIZE + 1008 + 4;
 
 // ===== BUFFERS =====
 const BUFFER_SIZE = 65536;
@@ -239,23 +240,6 @@ function flushReceiveBuffer()
 }
 
 
-function findSequence(buf, seq, start = 0)
-{
-  for (let i = start; i <= buf.length - seq.length; i++)
-  {
-    let match = true;
-    for (let j = 0; j < seq.length; j++)
-    {
-      if (buf[i + j] !== seq[j]) {
-        match = false;
-        break;
-      }
-    }
-    if (match) return i;
-  }
-  return -1;
-}
-
 /**
  * Process received data.
  *
@@ -328,9 +312,15 @@ function parseBuffer()
       ) >>> 0;
 
     // ===== FIND END =====
+    
+    const MAX_PAYLOAD = 1008;
+    const MAX_PACKET = HEADER_SIZE + MAX_PAYLOAD + 4;
+
     let endPos = -1;
 
-    for (let i = readPos + HEADER_SIZE; i <= writePos - 4; i++)
+    const searchEnd = Math.min(writePos - 4, readPos + MAX_PACKET);
+
+    for (let i = readPos + HEADER_SIZE; i <= searchEnd; i++)
     {
       if (
         buffer[i]     === END0 &&
@@ -342,6 +332,7 @@ function parseBuffer()
         break;
       }
     }
+    console.log("PayloadLen:", payloadLen);
 
     if (endPos === -1) return; // wait for more data
 
@@ -359,6 +350,8 @@ function parseBuffer()
     let ch1_sum = 0;
     let ch2_sum = 0;
 
+    let tempIndex = frameIndex;
+
     for (let i = payloadStart; i < payloadEnd; i += 4)
     {
       const val1 = (buffer[i] << 8) | buffer[i+1];
@@ -367,17 +360,19 @@ function parseBuffer()
       ch1_sum = (ch1_sum + val1) >>> 0;
       ch2_sum = (ch2_sum + val2) >>> 0;
 
-      frameBuffer[frameIndex++] = val1;
-      frameBuffer[frameIndex++] = val2;
+      frameBuffer[tempIndex++] = val1;
+      frameBuffer[tempIndex++] = val2;
     }
 
-    // ===== CHECKSUM =====
     if (ch1_sum !== sum1 || ch2_sum !== sum2) {
       console.log("Checksum FAIL", ch1_sum, sum1, ch2_sum, sum2);
       frameIndex = 0;
-      readPos++; // resync safely
+      readPos++;
       continue;
     }
+
+    // commit only if valid
+    frameIndex = tempIndex;
 
     // ===== ADVANCE BUFFER =====
     readPos = endPos + 4;
