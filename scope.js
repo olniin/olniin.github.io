@@ -332,14 +332,14 @@ function parseBuffer()
         break;
       }
     }
-    console.log("PayloadLen:", payloadLen);
 
     if (endPos === -1) return; // wait for more data
 
     const payloadStart = readPos + HEADER_SIZE;
     const payloadEnd   = endPos;
     const payloadLen   = payloadEnd - payloadStart;
-
+    
+    console.log("PayloadLen:", payloadLen);
     // ===== VALIDATE SIZE =====
     if (payloadLen <= 0 || (payloadLen % 4 !== 0)) {
       readPos++; // resync
