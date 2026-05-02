@@ -14,10 +14,6 @@ let lastReceiveTime = 0;
 let bufferTimeout = null;
 const MAX_BUFFER_SIZE = 65536;
 
-/* DATA VARIABLES ------------------------------------------------------------------------------ */
-let isRunning = true;
-let triggerLevel = 2047;
-
 /* USB PROTOCOL VARIABLES ---------------------------------------------------------------------- */
 const usbMagic = [0x69, 0xF7, 0x69, 0xF7, 0x00];
 const usbHeaderSize = 16;
@@ -43,16 +39,9 @@ const INTERP_UP = 4;
 
 // Set this to your real sample rate (before interpolation).
 // From your earlier setup, you mentioned TIM3 ~ 500 kHz triggering ADC:
-let sampleRateHz = 10000;
 
-// 0V reference as ADC code (midscale for bipolar display)
-let ch1ZeroCode = 2047;
-let ch2ZeroCode = 2047;
 
-// cached UI scales (updated from selects)
-let timeMsPerDiv = 10;
-let ch1mVPerDiv = 250;
-let ch2mVPerDiv = 250;
+
 
 /* CHECK BROWSER SUPPORT ----------------------------------------------------------------------- */
 //if (!('serial' in navigator)) {
@@ -262,7 +251,8 @@ function findMagic(buffer)
  * @param {Uint8Array} data incoming data as uint8 values
  * @returns null
  */
-function processReceivedData(data) {
+function processReceivedData(data)
+{
   rxBuffer.push(...data); // incoming data chuncks are appended to rolling buffer
 
   while (true) {
@@ -340,7 +330,8 @@ function processReceivedData(data) {
  * 
  * @param {Uint8Array} frameBuf
  */
-function divideDataIntoChannels(frameBuf) {
+function divideDataIntoChannels(frameBuf)
+{
   const sampleCount = frameBuf.length >> 1; // bitshift division by 2 -> 2048
   const channelLength = sampleCount >> 1;   // 2048 / 2 -> 1024 per channel
   const ch1Values = new Int16Array(channelLength);
@@ -366,6 +357,63 @@ function divideDataIntoChannels(frameBuf) {
 }
 
 /* SCOPE DRAWING FUNCTIONS --------------------------------------------------------------------- */
+// global variable defaults
+const zeroVoltLevel = 2047;
+const hardwareGainComp = 3;
+const xDivs = 10;
+const yDivs = 8;
+let triggerLevel = 2047;
+let timeMsPerDiv = 1;
+let ch1mVPerDiv = 250;
+let ch2mVPerDiv = 250;
+let isRunning = true;
+let sampleRateHz = 10000;
+
+/**
+ * Update the value of triggerLevel upon change.
+ */
+function updateTriggerLevel()
+{
+  const slider = document.getElementById('gen-trig');
+  if (!slider) return;
+  triggerLevel = Number(slider.value);
+}
+
+/**
+ * Update the values of timeMsPerDiv, ch1mVPerDiv and ch2mVPerDiv.
+ */
+function updateScopeScales()
+{
+  const timeSel = document.getElementById('time-scale');
+  const ch1Sel = document.getElementById('ch1-scale');
+  const ch2Sel = document.getElementById('ch2-scale');
+
+  if (timeSel) timeMsPerDiv = Number(timeSel.value);  // ms/div
+  if (ch1Sel) ch1mVPerDiv = Number(ch1Sel.value);     // mV/div
+  if (ch2Sel) ch2mVPerDiv = Number(ch2Sel.value);     // mV/div
+}
+
+// update selections on load
+window.addEventListener('DOMContentLoaded', () => {
+  updateScopeScales();
+
+  document.getElementById('time-scale')?.addEventListener('change', updateScopeScales());
+  document.getElementById('ch1-scale')?.addEventListener('change', updateScopeScales());
+  document.getElementById('ch2-scale')?.addEventListener('change', updateScopeScales());
+});
+
+
+/**
+ * Toggle scope display update.
+ */
+function toggleDisplayUpdate()
+{
+  const btn = document.getElementById('stopBtn');
+  
+  isRunning = !isRunning;
+  btn.classList.toggle('active');
+  btn.textContent = isRunning ? 'STOP' : 'RUN';
+}
 
 /**
  * Draw the oscilloscope background grid.
@@ -375,9 +423,8 @@ function divideDataIntoChannels(frameBuf) {
  * @param {*} width
  * @param {*} height
  */
-function drawGrid(ctx, padding, width, height) {
-  const xDivs = 10;
-  const yDivs = 8;
+function drawGrid(ctx, padding, width, height)
+{
   const drawWidth = width - 2 * padding;
   const drawHeight = height - 2 * padding;
   const xStep = drawWidth / xDivs;
@@ -419,6 +466,74 @@ function drawGrid(ctx, padding, width, height) {
   ctx.restore();
 }
 
+/**
+ * Plot full scope frame.
+ *
+ * @param {Uint8Array} ch1 readings from ADC1
+ * @param {Uint8Array} ch2 readings from ADC1
+ * @returns null
+ */
+function plotFrame(ch1, ch2) {
+  if (!isRunning) return;
+
+  const canvas = document.getElementById("screen");
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  const padding = 10;
+  const drawWidth = width - 2*padding;
+  const drawHeight = height - 2*padding;
+
+  // background grid and trigger line
+  drawGrid(ctx, padding, width, height);
+  //drawTrigger(ctx, padding, width, height);
+
+  // time scaling (ms)
+  const totalTime = timeMsPerDiv * xDivs;
+  const samplesPerScreen = Math.floor((sampleRateHz * totalTime) / 1000);
+  const visibleSamples = Math.min(samplesPerScreen, ch1.length);  // in case not enough data
+  const xStep = drawWidth / visibleSamples;
+
+  // voltage scaling
+  const adcTomV = (3300 / 4096) * hardwareGainComp; // scale
+  const yPixelsPerDiv = drawHeight / yDivs;
+  const ch1ScaleFactor = yPixelsPerDiv / ch1mVPerDiv;
+  const ch2ScaleFactor = yPixelsPerDiv / ch2mVPerDiv;
+
+  // draw ch1 data
+  ctx.save();
+  ctx.strokeStyle = "#94b1ff";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+
+  let x = padding;
+  for (let i=0; i<visibleSamples; i++) {
+    const mV = (ch1[i]-zeroVoltLevel) * adcTomV;
+    const y = (height/2) - (mV*ch1ScaleFactor);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+    x += xStep;
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // draw ch2 data
+  ctx.save();
+  ctx.strokeStyle = "#ff6600";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+
+  x = padding;
+  for (let i=0; i<visibleSamples; i++) {
+    const mV = (ch2[i] - zeroVoltLevel) * adcTomV;
+    const y = (height / 2) - (mV * ch2ScaleFactor);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+    x += xStep;
+  }
+  ctx.stroke();
+  ctx.restore();
+}
 
 
 
@@ -492,18 +607,6 @@ async function sendHex()
     console.error('Send error:', err);
     alert('Failed to send: ' + err.message);
   }
-}
-
-/**
- * Toggle scope display update.
- */
-function toggleStop()
-{
-  const btn = document.getElementById('stopBtn');
-
-  isRunning = !isRunning;
-  btn.classList.toggle('active');
-  btn.textContent = isRunning ? 'STOP' : 'RUN';
 }
 
 /**
