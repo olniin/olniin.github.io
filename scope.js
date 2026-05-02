@@ -313,7 +313,7 @@ function processReceivedData(data) {
       expectedIndex++;
 
       if (expectedIndex === 5) {  // frame complete
-        if (frameOffset === FRAME_TOTAL_SIZE) {
+        if (frameOffset === payloadTotalSize) {
           //divideDataIntoChannels(frameBuffer);
           console.log(frameBuffer);
         } else {
