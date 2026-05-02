@@ -314,8 +314,7 @@ function processReceivedData(data) {
 
       if (expectedIndex === 5) {  // frame complete
         if (frameOffset === payloadTotalSize) {
-          //divideDataIntoChannels(frameBuffer);
-          console.log(frameBuffer);
+          divideDataIntoChannels(frameBuffer);
         } else {
           console.warn("Frame size mismatch:", frameOffset);
         }
@@ -336,6 +335,32 @@ function processReceivedData(data) {
   }
 }
 
+/**
+ * Divide raw ADC values into two channels.
+ * 
+ * @param {Uint8Array} frameBuf
+ */
+function divideDataIntoChannels(frameBuf) {
+  const sampleCount = frameBuf.length >> 1; // bitshift division by 2 -> 2048
+  const channelLength = sampleCount >> 1;   // 2048 / 2 -> 1024 per channel
+  const ch1Values = new Int16Array(channelLength);
+  const ch2Values = new Int16Array(channelLength);
+
+  let channelIndex = 0;
+  // data is formatted - [CH1_H, CH1_L, CH2_H, CH2_L, ...]
+  for (let i=0; i<frameBuf.length; i+=4) {
+    let val1 = (frameBuf[i] << 8) | frameBuf[i + 1];
+    let val2 = (frameBuf[i + 2] << 8) | frameBuf[i + 3];
+    ch1Values[channelIndex] = val1;
+    ch2Values[channelIndex] = val2;
+    channelIndex++;
+  }
+  console.log("CH1:", ch1Values);
+  console.log("CH2:", ch2Values);
+
+  // Pass to next stage (renderer / processing)
+  //handleChannels(ch1, ch2);
+}
 
 
 
