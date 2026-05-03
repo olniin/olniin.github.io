@@ -670,18 +670,29 @@ function calculatePhaseShift(signalA, signalB, frequency, sampleRate) {
   const n = signalA.length;
   let maxCorrelation = -Infinity;
   let sampleDelay = 0;
+  let meanA = 0;
+  let meanB = 0;
 
   // search for best match by shifting signal B (lag), while
   // limiting search to one period
   const periodInSamples = Math.floor(sampleRate / frequency);
   const searchRange = Math.min(n, periodInSamples);
 
+  // remove DC offset
+  for (let i=0; i<n; i++) {
+    meanA += signalA[i];
+    meanB += signalB[i];
+  }
+  meanA /= n
+  meanB /= n
+
+  // find correlation
   for (let lag=-searchRange; lag<searchRange; lag++) {
     let correlation = 0;
     for (let i=0; i<n; i++) {
       const j = i + lag;
       if (j >= 0 && j < n) {
-        correlation += signalA[i] * signalB[j];
+        correlation += (signalA[i]-meanA) * (signalB[j]-meanB);
       }
     }
     if (correlation > maxCorrelation) {
