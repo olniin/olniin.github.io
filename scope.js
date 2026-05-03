@@ -465,6 +465,7 @@ function updateScopeScales()
 window.addEventListener('DOMContentLoaded', () => {
   canvas = document.getElementById('screen');
   ctx = canvas.getContext('2d');
+  redrawGrid(canvas.width, canvas.height, 10);
 
   document.getElementById('time-scale')?.addEventListener('change', updateScopeScales);
   document.getElementById('ch1-scale')?.addEventListener('change', updateScopeScales);
@@ -484,6 +485,16 @@ function toggleDisplayUpdate()
   isRunning = !isRunning;
   btn.classList.toggle('active');
   btn.textContent = isRunning ? 'STOP' : 'RUN';
+}
+
+
+let gridCanvas = document.createElement('canvas');
+let gridCtx = gridCanvas.getContext('2d');
+
+function redrawGrid(width, height, padding) {
+  gridCanvas.width = width;
+  gridCanvas.height = height;
+  drawGrid(gridCtx, padding, width, height);
 }
 
 /**
@@ -547,7 +558,7 @@ function plotFrame(ch1, ch2) {
   const height = canvas.height;
 
   // background grid and trigger line
-  drawGrid(width, height);
+  ctx.drawImage(gridCanvas, 0, 0);
   //drawTrigger(ctx, padding, width, height);
 
   // time scaling (ms)
