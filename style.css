@@ -91,7 +91,7 @@ main {
 
 .scope-main {
   display: grid;
-  grid-template-rows: 4fr 1fr;
+  grid-template-rows: 8fr 3fr;
 }
 
 .scope-side {

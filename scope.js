@@ -219,11 +219,11 @@ async function sendHex()
   inputFreq.value = freqClamped;
 
   // sample rate adjustment
-  if (freq <= 1000) {
+  if (freq < 1000) {
 		sampleRateHz = 10000;
-	} else if (freq <= 5000) {
+	} else if (freq < 5000) {
 		sampleRateHz = 50000;
-	} else if (freq <= 10000) {
+	} else if (freq < 10000) {
 		sampleRateHz = 100000;
 	} else {
 		sampleRateHz = 300000;
