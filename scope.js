@@ -621,6 +621,11 @@ function plotFrame(ch1, ch2) {
 /* MEASUREMENTS -------------------------------------------------------------------------------- */
 /**
  * Calculate RMS from array using adcTomV conversion.
+ * @param {Uint8Array} values
+ * @param {Number} len
+ * @param {Number} offset
+ * @param {Number} mvPerADCCount
+ * @returns RMS of array relative to offset
  */
 function calcRMS(values, len, offset, mvPerADCCount)
 {
@@ -633,7 +638,30 @@ function calcRMS(values, len, offset, mvPerADCCount)
 }
 
 /**
+ * Estimate signal frequency.
+ * @param {Uint8Array} values
+ * @param {Number} zeroLine
+ * @param {Number} sampleRate
+ * @returns estimated frequency
+ */
+function estimateFrequency(values, zeroLine, sampleRate) {
+  let crossings = 0;
+  for (let i=1; i<values.length; i++) {
+    // check if the signal crossed the zero line
+    if ((data[i] >= zeroLine && data[i-1] < zeroLine) ||
+        (data[i] < zeroLine && data[i-1] >= zeroLine)) {
+      crossings++;
+    }
+  }
+  // frequency = (crossings/2) / total time
+  const totalTime = values.length / sampleRate;
+  return (crossings/2) / totalTime;
+}
+
+/**
  * Measurement data text updater.
+ * @param {Text} elementId
+ * @param {Text} text
  */
 function updateText(elementId, text)
 {
@@ -643,16 +671,25 @@ function updateText(elementId, text)
 
 /**
  * Update measurement values.
+ * @param {Uint8Array} rms1
+ * @param {Uint8Array} rms2
  */
-function measurementUpdate(rms1, rms2)
+function measurementUpdate(rms1, rms2, freq1, freq2)
 {
   const formatRMS = (rms) => {
     if (!Number.isFinite(rms)) return "- mV";
     if (rms>=1000) return (rms/1000).toFixed(3) + " V";
     else return rms.toFixed(1) + " mV"
   }
+  const formatFreq = (freq) => {
+    if (!Number.isFinite(freq)) return "- Hz";
+    if (freq>=1000) return (freq/1000).toFixed(2) + " kHz";
+    else return freq.toFixed(2) + " kHz"
+  }
   updateText("ch1-rms", formatRMS(rms1));
   updateText("ch2-rms", formatRMS(rms2));
+  updateText("ch1-freq", formatFreq(freq1));
+  updateText("ch2-freq", formatFreq(freq2));
 }
 
 /**
@@ -665,8 +702,11 @@ function scopeMeasurements(valuesCh1, valuesCh2)
   // calculate
   const rms1 = calcRMS(valuesCh1, valuesCh1.length, zeroVoltLevel, adcTomV);
   const rms2 = calcRMS(valuesCh2, valuesCh2.length, zeroVoltLevel, adcTomV);
+  // estimate
+  const freq1 = estimateFrequency(valuesCh1, zeroVoltLevel, sampleRateHz);
+  const freq2 = estimateFrequency(valuesCh2, zeroVoltLevel, sampleRateHz);
   // update
-  measurementUpdate(rms1, rms2);
+  measurementUpdate(rms1, rms2, freq1, freq2);
 }
 
 
