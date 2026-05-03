@@ -322,7 +322,7 @@ function processReceivedData(data)
     }
 
     // remove processed packet from the ring buffer
-    rxBuffer = rxBuffer.slice(packetSize);
+    rxBuffer = rxBuffer.slice(packetSize-4);
   }
 }
 
