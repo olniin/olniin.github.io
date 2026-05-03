@@ -684,7 +684,7 @@ function measurementUpdate(rms1, rms2, freq1, freq2)
   const formatFreq = (freq) => {
     if (!Number.isFinite(freq)) return "- Hz";
     if (freq>=1000) return (freq/1000).toFixed(2) + " kHz";
-    else return freq.toFixed(2) + " kHz"
+    else return freq.toFixed(2) + " Hz"
   }
   updateText("ch1-rms", formatRMS(rms1));
   updateText("ch2-rms", formatRMS(rms2));
