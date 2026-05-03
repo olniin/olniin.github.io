@@ -535,6 +535,7 @@ function plotFrame(ch1, ch2) {
   }
   ctx.stroke();
   ctx.restore();
+  console.log("DRAWING DONE", ch1, ch2);
 }
 
 
