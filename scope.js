@@ -869,7 +869,7 @@ function measureAndUpdate(ch1, ch2) {
   if (!x || !y || N < MIN_MEAS_SAMPLES) return;
 
   // Scale factor for converting counts -> mV (same as your drawing)
-  const mvPerCount = (3300 / 4096) * hardwareGainComp;
+  const mvPerCount = adcTomV;
 
   // RMS over the measurement window
   const ch1RmsMv = computeRmsMv(x, zeroVoltLevel, mvPerCount, N);
