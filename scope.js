@@ -303,6 +303,7 @@ function processReceivedData(data)
       frameBuffer.set(payload, frameOffset);
       frameOffset += payloadLen;
       expectedIndex++;
+      console.log("FRAME ADDED! new offset, expectedIndex", frameOffset, expectedIndex);
 
       if (expectedIndex === 5) {  // frame complete
         if (frameOffset === payloadTotalSize) {
