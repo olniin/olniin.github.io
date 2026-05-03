@@ -703,8 +703,18 @@ function scopeMeasurements(valuesCh1, valuesCh2)
   const rms1 = calcRMS(valuesCh1, valuesCh1.length, zeroVoltLevel, adcTomV);
   const rms2 = calcRMS(valuesCh2, valuesCh2.length, zeroVoltLevel, adcTomV);
   // estimate
-  const freq1 = estimateFrequency(valuesCh1, zeroVoltLevel, sampleRateHz);
-  const freq2 = estimateFrequency(valuesCh2, zeroVoltLevel, sampleRateHz);
+  let freq1 = estimateFrequency(valuesCh1, zeroVoltLevel, sampleRateHz);
+  let freq2 = estimateFrequency(valuesCh2, zeroVoltLevel, sampleRateHz);
+  if (freq1 < 1000) {
+    const evalCh1 = new Uint8Array(valuesCh1.length*4);
+    for (let i=0; i<4; i++) evalCh1.set(valuesCh1, i*valuesCh1.length);
+    freq1 = estimateFrequency(evalCh1, zeroVoltLevel, sampleRateHz);
+  }
+  if (freq2 < 1000) {
+    const evalCh2 = new Uint8Array(valuesCh2.length*4);
+    for (let i=0; i<4; i++) evalCh2.set(valuesCh2, i*valuesCh2.length);
+    freq2 = estimateFrequency(evalCh2, zeroVoltLevel, sampleRateHz);
+  }
   // update
   measurementUpdate(rms1, rms2, freq1, freq2);
 }
