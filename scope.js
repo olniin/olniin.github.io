@@ -547,7 +547,7 @@ function plotFrame(ch1, ch2) {
   const height = canvas.height;
 
   // background grid and trigger line
-  drawGrid(ctx, padding, width, height);
+  drawGrid(width, height);
   //drawTrigger(ctx, padding, width, height);
 
   // time scaling (ms)
