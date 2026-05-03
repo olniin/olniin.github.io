@@ -630,8 +630,67 @@ function plotFrame(ch1, ch2) {
 
 /* -------------------- MEASUREMENTS (RMS / FREQ / PHASE) -------------------- */
 
-const MEAS_EVERY_N_FRAMES = 3;   // don’t compute every draw; saves CPU
+// How often to COMPUTE (we still push samples every call)
+const MEAS_EVERY_N_FRAMES = 3;
 let _measFrameCounter = 0;
+
+// Rolling buffer (ADC counts stored as floats)
+const MEAS_BUFFER_LEN = 8192;          // ~0.82 s at 10 kHz
+const MEAS_WINDOW_SEC = 0.60;          // ~0.60 s window for calculations
+const MIN_MEAS_SAMPLES = 512;          // avoid too-short windows
+
+const measBuf1 = new Float32Array(MEAS_BUFFER_LEN);
+const measBuf2 = new Float32Array(MEAS_BUFFER_LEN);
+let measIndex = 0;
+let measCount = 0;                     // number of valid samples in buffer (<= MEAS_BUFFER_LEN)
+
+// Scratch buffers for contiguous window extraction (allocated once)
+const win1 = new Float32Array(MEAS_BUFFER_LEN);
+const win2 = new Float32Array(MEAS_BUFFER_LEN);
+
+/**
+ * Push one frame of samples into the rolling measurement buffer.
+ * ch1/ch2 can be Uint16Array, Array<number>, etc.
+ */
+function pushMeasurementData(ch1, ch2) {
+  const n = Math.min(ch1.length, ch2.length);
+  for (let i = 0; i < n; i++) {
+    measBuf1[measIndex] = ch1[i];
+    measBuf2[measIndex] = ch2[i];
+
+    measIndex++;
+    if (measIndex >= MEAS_BUFFER_LEN) measIndex = 0;
+
+    if (measCount < MEAS_BUFFER_LEN) measCount++;
+  }
+}
+
+/**
+ * Extract last N samples from rolling buffers into win1/win2 as contiguous arrays.
+ * Returns { x, y, N } where x/y are the scratch arrays and N is the valid length.
+ */
+function getLatestWindow(sampleRateHz) {
+  // Desired N based on seconds, clamped to available history
+  let N = Math.floor(sampleRateHz * MEAS_WINDOW_SEC);
+  N = Math.max(MIN_MEAS_SAMPLES, N);
+  N = Math.min(N, measCount, MEAS_BUFFER_LEN);
+
+  if (N < MIN_MEAS_SAMPLES) return { x: null, y: null, N: 0 };
+
+  // Start index of the last N samples in the circular buffer
+  let start = measIndex - N;
+  if (start < 0) start += MEAS_BUFFER_LEN;
+
+  // Copy into contiguous scratch arrays
+  for (let i = 0; i < N; i++) {
+    const idx = (start + i);
+    const j = (idx >= MEAS_BUFFER_LEN) ? (idx - MEAS_BUFFER_LEN) : idx;
+    win1[i] = measBuf1[j];
+    win2[i] = measBuf2[j];
+  }
+
+  return { x: win1, y: win2, N };
+}
 
 function wrap180(deg) {
   deg = ((deg + 180) % 360 + 360) % 360 - 180;
@@ -639,80 +698,125 @@ function wrap180(deg) {
 }
 
 /**
- * Compute AC RMS in mV (signal centred around zeroVoltLevel).
- * RMS = sqrt(mean(x^2))  [4](https://www.geeksforgeeks.org/javascript/rms-value-of-array-in-javascript/)
+ * AC RMS in mV around offsetCounts (e.g. zeroVoltLevel).
  */
-function computeRmsMv(adc, offsetCounts, mvPerCount, start = 0, n = adc.length) {
+function computeRmsMv(adc, offsetCounts, mvPerCount, N) {
   let sumSq = 0.0;
-  const end = Math.min(adc.length, start + n);
-
-  for (let i = start; i < end; i++) {
+  for (let i = 0; i < N; i++) {
     const xMv = (adc[i] - offsetCounts) * mvPerCount;
     sumSq += xMv * xMv;
   }
-  const N = Math.max(1, end - start);
-  return Math.sqrt(sumSq / N);
+  return Math.sqrt(sumSq / Math.max(1, N));
 }
 
 /**
- * Estimate frequency using rising zero-crossings with linear interpolation.
- * Count crossings over the window, average period. [1](https://www.raymaps.com/index.php/frequency-estimation-using-zero-crossing-method/)
+ * Rising zero-crossing + linear interpolation + linear regression on crossing indices.
+ * More stable than "average period" because it uses all crossings.
  *
- * Returns { freqHz, crossings } where crossings is an array of fractional sample indices.
+ * Returns { freqHz, crossingsCount }
  */
-function estimateFreqZeroCross(adc, sampleRateHz, offsetCounts, start = 0, n = adc.length) {
-  const end = Math.min(adc.length, start + n);
+function estimateFreqZeroCrossLR(adc, sampleRateHz, offsetCounts, N) {
+  const HYST = 6; // ADC counts; tune if needed
+
+  // Collect fractional crossing indices
   const crossings = [];
+  let prev = adc[0] - offsetCounts;
 
-  // small hysteresis in ADC counts to reduce chatter around zero
-  const HYST = 6; // tweak based on noise; 0 disables
-
-  let prev = adc[start] - offsetCounts;
-
-  for (let i = start + 1; i < end; i++) {
+  for (let i = 1; i < N; i++) {
     const cur = adc[i] - offsetCounts;
 
-    // Rising crossing: prev < -HYST and cur >= +HYST
     if (prev < -HYST && cur >= HYST) {
-      // Linear interpolation of zero crossing between i-1 and i:
-      // prev + t*(cur-prev) = 0 => t = prev / (prev - cur)
-      const t = prev / (prev - cur);           // 0..1
-      const idx = (i - 1) + t;                 // fractional sample index
-      crossings.push(idx);
+      // Linear interpolation of the zero-crossing
+      const t = prev / (prev - cur);          // 0..1
+      crossings.push((i - 1) + t);
     }
-
     prev = cur;
   }
 
-  if (crossings.length < 2) return { freqHz: NaN, crossings };
+  // Need >= 3 crossings (>= 2 periods) for stability
+  if (crossings.length < 3) return { freqHz: NaN, crossingsCount: crossings.length };
 
-  // Average period in samples
-  let sumPeriod = 0.0;
-  for (let k = 1; k < crossings.length; k++) {
-    sumPeriod += (crossings[k] - crossings[k - 1]);
+  // Linear regression: crossings[k] ≈ a + k * periodSamples
+  let sumK = 0, sumI = 0, sumKK = 0, sumKI = 0;
+  for (let k = 0; k < crossings.length; k++) {
+    const idx = crossings[k];
+    sumK += k;
+    sumI += idx;
+    sumKK += k * k;
+    sumKI += k * idx;
   }
-  const avgPeriodSamples = sumPeriod / (crossings.length - 1);
-  const freqHz = sampleRateHz / avgPeriodSamples;
+  const n = crossings.length;
+  const denom = (n * sumKK - sumK * sumK);
+  if (denom === 0) return { freqHz: NaN, crossingsCount: crossings.length };
 
-  return { freqHz, crossings };
+  const periodSamples = (n * sumKI - sumK * sumI) / denom;
+  const freqHz = sampleRateHz / periodSamples;
+
+  // Sanity
+  if (!Number.isFinite(freqHz) || freqHz <= 0) return { freqHz: NaN, crossingsCount: crossings.length };
+
+  return { freqHz, crossingsCount: crossings.length };
 }
 
 /**
- * Estimate phase (deg) between two channels using zero-crossing time delay.
- * phi = 360 * f * dt, wrapped to [-180..180]. [2](https://sengpielaudio.com/calculator-timedelayphase.htm)[3](https://support.dewesoft.com/en/support/solutions/articles/14000086629-calculating-the-time-delay-between-two-signals-using-correlation-math)
+ * Normalised bounded cross-correlation to estimate delay (lag in samples).
+ * We search only within +/- maxLag (keeps it fast and avoids wrong peaks).
+ * Lag at max correlation is the time shift. [3](https://stackoverflow.com/questions/41492882/find-time-shift-of-two-signals-using-cross-correlation)[4](https://www.mathworks.com/help/matlab/ref/xcorr.html)
  *
- * We use a crossing near the middle of the window to reduce edge effects.
+ * Returns fractional lag (sub-sample refined via parabola fit).
  */
-function estimatePhaseDegFromCrossings(cross1, cross2, sampleRateHz, freqHz) {
-  if (!Number.isFinite(freqHz) || cross1.length === 0 || cross2.length === 0) return NaN;
+function estimateDelayXCorr(x, y, N, maxLag) {
+  // Mean remove
+  let meanX = 0, meanY = 0;
+  for (let i = 0; i < N; i++) { meanX += x[i]; meanY += y[i]; }
+  meanX /= N; meanY /= N;
 
-  // pick the crossing closest to the middle index (more stable than the first crossing)
-  const mid1 = cross1[Math.floor(cross1.length / 2)];
-  const mid2 = cross2[Math.floor(cross2.length / 2)];
+  // Amplitude normalisation (stabilises correlation peak when amplitudes differ)
+  let maxX = 1e-9, maxY = 1e-9;
+  for (let i = 0; i < N; i++) {
+    const dx = x[i] - meanX;
+    const dy = y[i] - meanY;
+    const ax = Math.abs(dx), ay = Math.abs(dy);
+    if (ax > maxX) maxX = ax;
+    if (ay > maxY) maxY = ay;
+  }
 
-  const dt = (mid2 - mid1) / sampleRateHz;      // seconds (ch2 relative to ch1)
-  const phaseDeg = wrap180(360.0 * freqHz * dt);
-  return phaseDeg;
+  // Helper: correlation at a specific lag using normalised sequences
+  function corrAtLag(lag) {
+    let s = 0;
+    const i0 = Math.max(0, -lag);
+    const i1 = Math.min(N, N - lag);
+    for (let i = i0; i < i1; i++) {
+      const a = (x[i] - meanX) / maxX;
+      const b = (y[i + lag] - meanY) / maxY;
+      s += a * b;
+    }
+    // Normalise by overlap length so different lags compare fairly
+    const L = Math.max(1, i1 - i0);
+    return s / L;
+  }
+
+  let bestLag = 0;
+  let bestCorr = -Infinity;
+
+  for (let lag = -maxLag; lag <= maxLag; lag++) {
+    const c = corrAtLag(lag);
+    if (c > bestCorr) { bestCorr = c; bestLag = lag; }
+  }
+
+  // Sub-sample refinement (parabolic interpolation around peak)
+  if (bestLag > -maxLag && bestLag < maxLag) {
+    const cM1 = corrAtLag(bestLag - 1);
+    const c0  = corrAtLag(bestLag);
+    const cP1 = corrAtLag(bestLag + 1);
+    const denom = (cM1 - 2 * c0 + cP1);
+    if (denom !== 0) {
+      const delta = 0.5 * (cM1 - cP1) / denom;    // usually [-0.5..0.5]
+      return bestLag + delta;
+    }
+  }
+
+  return bestLag;
 }
 
 function setText(id, text) {
@@ -720,11 +824,7 @@ function setText(id, text) {
   if (el) el.textContent = text;
 }
 
-/**
- * Update UI labels.
- */
 function updateReadingsUI({ ch1RmsMv, ch2RmsMv, ch1FreqHz, ch2FreqHz, phaseDeg }) {
-  // RMS: show as V if >= 1000 mV else mV
   const fmtRms = (mv) => {
     if (!Number.isFinite(mv)) return "-";
     if (mv >= 1000) return (mv / 1000).toFixed(3) + " V";
@@ -742,45 +842,68 @@ function updateReadingsUI({ ch1RmsMv, ch2RmsMv, ch1FreqHz, ch2FreqHz, phaseDeg }
     return deg.toFixed(1) + "°";
   };
 
-  setText("ch1-rms", fmtRms(ch1RmsMv));
-  setText("ch2-rms", fmtRms(ch2RmsMv));
+  setText("ch1-rms",  fmtRms(ch1RmsMv));
+  setText("ch2-rms",  fmtRms(ch2RmsMv));
   setText("ch1-freq", fmtFreq(ch1FreqHz));
   setText("ch2-freq", fmtFreq(ch2FreqHz));
-  setText("m-phase", fmtPhase(phaseDeg));
+  setText("m-phase",  fmtPhase(phaseDeg));
 }
 
 /**
- * Compute and update measurements (throttled).
- * Call this from plotFrame() after you’ve established visibleSamples.
+ * Main entry:
+ * Call measureAndUpdate(ch1, ch2) once per received frame (e.g., from plotFrame()).
+ *
+ * - Always pushes samples into rolling buffer.
+ * - Computes every MEAS_EVERY_N_FRAMES frames.
  */
-function measureAndUpdate(ch1, ch2, visibleSamples) {
+function measureAndUpdate(ch1, ch2) {
+  // Always push new data (critical so the rolling buffer stays up-to-date)
+  pushMeasurementData(ch1, ch2);
+
+  // Throttle compute (but not pushing)
   _measFrameCounter++;
   if ((_measFrameCounter % MEAS_EVERY_N_FRAMES) !== 0) return;
 
-  // Use the same scale conversion you use for drawing
-  const mvPerCount = adcTomV; // mV per ADC count (with your comp)
+  // Need enough history
+  const { x, y, N } = getLatestWindow(sampleRateHz);
+  if (!x || !y || N < MIN_MEAS_SAMPLES) return;
 
-  // RMS on the visible window (AC RMS about zeroVoltLevel)
-  const ch1RmsMv = computeRmsMv(ch1, zeroVoltLevel, mvPerCount, 0, visibleSamples);
-  const ch2RmsMv = computeRmsMv(ch2, zeroVoltLevel, mvPerCount, 0, visibleSamples);
+  // Scale factor for converting counts -> mV (same as your drawing)
+  const mvPerCount = (3300 / 4096) * hardwareGainComp;
 
-  // Frequency by zero-crossing (fast, good for clean-ish waveforms) [1](https://www.raymaps.com/index.php/frequency-estimation-using-zero-crossing-method/)
-  const f1 = estimateFreqZeroCross(ch1, sampleRateHz, zeroVoltLevel, 0, visibleSamples);
-  const f2 = estimateFreqZeroCross(ch2, sampleRateHz, zeroVoltLevel, 0, visibleSamples);
+  // RMS over the measurement window
+  const ch1RmsMv = computeRmsMv(x, zeroVoltLevel, mvPerCount, N);
+  const ch2RmsMv = computeRmsMv(y, zeroVoltLevel, mvPerCount, N);
 
+  // Frequency per channel (needs multiple cycles at low Hz) [1](https://www.raymaps.com/index.php/frequency-estimation-using-zero-crossing-method/)[2](https://e2e.ti.com/cfs-file/__key/telligent-evolution-components-attachments/00-14-01-00-00-66-61-09/Zero-Crossing-detection-Methods.pdf)
+  const f1 = estimateFreqZeroCrossLR(x, sampleRateHz, zeroVoltLevel, N);
+  const f2 = estimateFreqZeroCrossLR(y, sampleRateHz, zeroVoltLevel, N);
   const ch1FreqHz = f1.freqHz;
   const ch2FreqHz = f2.freqHz;
 
-  // Phase: use avg of the two freqs if both valid; else fall back
-  const freqForPhase =
-    (Number.isFinite(ch1FreqHz) && Number.isFinite(ch2FreqHz)) ? (0.5 * (ch1FreqHz + ch2FreqHz)) :
+  // Choose frequency for phase conversion
+  const f =
+    (Number.isFinite(ch1FreqHz) && Number.isFinite(ch2FreqHz)) ? 0.5 * (ch1FreqHz + ch2FreqHz) :
     (Number.isFinite(ch1FreqHz) ? ch1FreqHz :
     (Number.isFinite(ch2FreqHz) ? ch2FreqHz : NaN));
 
-  const phaseDeg = estimatePhaseDegFromCrossings(f1.crossings, f2.crossings, sampleRateHz, freqForPhase);
+  // Phase via correlation delay (bounded)
+  let phaseDeg = NaN;
+  if (Number.isFinite(f) && f >= 5) {
+    // Search within +/- half period (in samples), and also keep it bounded by N/3
+    const halfPeriod = Math.max(2, Math.floor(sampleRateHz / (2 * f)));
+    const maxLag = Math.max(2, Math.min(halfPeriod, Math.floor(N / 3)));
+
+    const lag = estimateDelayXCorr(x, y, N, maxLag);
+    const dt = lag / sampleRateHz;
+
+    // phi = 360 * f * dt [5](https://sengpielaudio.com/calculator-timedelayphase.htm)
+    phaseDeg = wrap180(360.0 * f * dt);
+  }
 
   updateReadingsUI({ ch1RmsMv, ch2RmsMv, ch1FreqHz, ch2FreqHz, phaseDeg });
 }
+
 
 
 
