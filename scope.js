@@ -200,7 +200,6 @@ async function sendHex()
     alert('Please connect to ISC Scope first!');
     return;
   }
-
   const inputFreq = document.getElementById('gen-freq');
   const inputType = document.getElementById('gen-wave');
   const inputAttn = document.getElementById('gen-attn');
@@ -212,9 +211,12 @@ async function sendHex()
   const type = Number.parseInt(inputType?.value ?? '0', 10) & 0x03; // 2 bits
   const attn = Number.parseInt(inputAttn?.value ?? '0', 10) & 0x03; // 2 bits
   const trig = Number.parseInt(inputTrig?.value ?? '0', 10) >>> 0;  // uint16
-
-  // clamp input frequency
+  const amp1 = Number.parseInt(inputAmp1?.value ?? '0', 10) & 0x01; // 1 bit
+  const amp2 = Number.parseInt(inputAmp2?.value ?? '0', 10) & 0x01; // 1 bit
+  
+  // clamp input frequency and show it in the UI
   const freqClamped = Math.min(Math.max(freq, 10), 50000) >>> 0;
+  inputFreq.value = freqClamped;
 
   // sample rate adjustment
   if (freq <= 1000) {
@@ -227,7 +229,7 @@ async function sendHex()
 		sampleRateHz = 300000;
 	}
 
-  const mode = ((type & 0x03) << 2) | (attn & 0x03);
+  const mode = (amp1 << 5) | (amp2 << 4) | (type << 2) | (attn);
 
   const data = new Uint8Array([
     0x47, 0xF7, 0xF7,
