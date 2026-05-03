@@ -648,8 +648,8 @@ function estimateFrequency(values, zeroLine, sampleRate) {
   let crossings = 0;
   for (let i=1; i<values.length; i++) {
     // check if the signal crossed the zero line
-    if ((data[i] >= zeroLine && data[i-1] < zeroLine) ||
-        (data[i] < zeroLine && data[i-1] >= zeroLine)) {
+    if ((values[i] >= zeroLine && values[i-1] < zeroLine) ||
+        (values[i] < zeroLine && values[i-1] >= zeroLine)) {
       crossings++;
     }
   }
