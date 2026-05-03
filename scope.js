@@ -758,7 +758,7 @@ function measureAndUpdate(ch1, ch2, visibleSamples) {
   if ((_measFrameCounter % MEAS_EVERY_N_FRAMES) !== 0) return;
 
   // Use the same scale conversion you use for drawing
-  const mvPerCount = (3300 / 4096) * hardwareGainComp; // mV per ADC count (with your comp)
+  const mvPerCount = adcTomV; // mV per ADC count (with your comp)
 
   // RMS on the visible window (AC RMS about zeroVoltLevel)
   const ch1RmsMv = computeRmsMv(ch1, zeroVoltLevel, mvPerCount, 0, visibleSamples);
