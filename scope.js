@@ -464,7 +464,7 @@ function updateScopeScales()
  * Update variables on load & add hooks.
  */
 window.addEventListener('DOMContentLoaded', () => {
-  gridCanvas = document.createElement('grid');
+  gridCanvas = document.createElement('canvas');
   gridCtx = gridCanvas.getContext('2d');
   canvas = document.getElementById('screen');
   ctx = canvas.getContext('2d');
