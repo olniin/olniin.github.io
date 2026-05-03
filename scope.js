@@ -525,7 +525,7 @@ function drawGrid(width, height)
   ctx.strokeStyle = isLightTheme ? '#404040' : '#BABABA';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  const centerY = padding + drawHeight / 2;
+  const centerY = padding + (height - 2 * padding) / 2;
   ctx.moveTo(padding, centerY);
   ctx.lineTo(width-padding, centerY);
   ctx.stroke();
