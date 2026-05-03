@@ -425,6 +425,7 @@ const adcTomV = (3300 / 4095) * 3.05; // (ADC ref mV) / (ADC max val) * (hardwar
 const xDivs = 10;
 const yDivs = 8;
 // scope & canvas variables
+let gridCanvas, gridCtx;
 let canvas, ctx;
 let isRunning = true;
 let triggerLevel = 2047;
@@ -463,9 +464,11 @@ function updateScopeScales()
  * Update variables on load & add hooks.
  */
 window.addEventListener('DOMContentLoaded', () => {
+  gridCanvas = document.createElement('grid');
+  gridCtx = gridCanvas.getContext('2d');
   canvas = document.getElementById('screen');
   ctx = canvas.getContext('2d');
-  redrawGrid(canvas.width, canvas.height, 10);
+  drawGrid(canvas.width, canvas.height);
 
   document.getElementById('time-scale')?.addEventListener('change', updateScopeScales);
   document.getElementById('ch1-scale')?.addEventListener('change', updateScopeScales);
@@ -487,16 +490,6 @@ function toggleDisplayUpdate()
   btn.textContent = isRunning ? 'STOP' : 'RUN';
 }
 
-
-let gridCanvas = document.createElement('canvas');
-let gridCtx = gridCanvas.getContext('2d');
-
-function redrawGrid(width, height, padding) {
-  gridCanvas.width = width;
-  gridCanvas.height = height;
-  drawGrid(gridCtx, padding, width, height);
-}
-
 /**
  * Draw the oscilloscope background grid.
  *
@@ -507,41 +500,43 @@ function drawGrid(width, height)
 {
   const xStep = (width - 2 * padding) / xDivs;
   const yStep = (height - 2 * padding) / yDivs;
+  gridCanvas.width = width;
+  gridCanvas.height = height;
 
-  ctx.save();
+  gridCtx.save();
 
   // clear background
-  ctx.fillStyle = isLightTheme ? '#FFFFFF' : '#000000';
-  ctx.fillRect(0, 0, width, height);
+  gridCtx.fillStyle = isLightTheme ? '#FFFFFF' : '#000000';
+  gridCtx.fillRect(0, 0, width, height);
   
   // grid style depending on theme
-  ctx.strokeStyle = isLightTheme ? '#BABABA' : '#404040';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
+  gridCtx.strokeStyle = isLightTheme ? '#BABABA' : '#404040';
+  gridCtx.lineWidth = 1;
+  gridCtx.beginPath();
   // vertical lines
   for (let i=0; i<=xDivs; i++) {
     const x = padding + i*xStep;
-    ctx.moveTo(x, padding);
-    ctx.lineTo(x, height-padding);
+    gridCtx.moveTo(x, padding);
+    gridCtx.lineTo(x, height-padding);
   }
   // horizontal lines
   for (let i=0; i<=yDivs; i++) {
     const y = padding + i*yStep;
-    ctx.moveTo(padding, y);
-    ctx.lineTo(width-padding, y);
+    gridCtx.moveTo(padding, y);
+    gridCtx.lineTo(width-padding, y);
   }
-  ctx.stroke();
+  gridCtx.stroke();
 
   // horizontal centre
-  ctx.strokeStyle = isLightTheme ? '#404040' : '#BABABA';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
+  gridCtx.strokeStyle = isLightTheme ? '#404040' : '#BABABA';
+  gridCtx.lineWidth = 1.5;
+  gridCtx.beginPath();
   const centerY = padding + (height - 2 * padding) / 2;
-  ctx.moveTo(padding, centerY);
-  ctx.lineTo(width-padding, centerY);
-  ctx.stroke();
+  gridCtx.moveTo(padding, centerY);
+  gridCtx.lineTo(width-padding, centerY);
+  gridCtx.stroke();
 
-  ctx.restore();
+  gridCtx.restore();
 }
 
 /**
