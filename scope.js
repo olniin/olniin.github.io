@@ -646,16 +646,20 @@ function calcRMS(values, len, offset, mvPerADCCount)
  */
 function estimateFrequency(values, zeroLine, sampleRate) {
   let crossings = 0;
+  let firstCrossing = 0;
+  let secondCrossing = 0;
   for (let i=1; i<values.length; i++) {
     // check if the signal crossed the zero line
     if ((values[i] >= zeroLine && values[i-1] < zeroLine) ||
         (values[i] < zeroLine && values[i-1] >= zeroLine)) {
       crossings++;
+      if (crossings === 1) firstCrossing = i;
+      if (crossings === 1) secondCrossing = i;
     }
   }
   // frequency = (crossings/2) / total time
   const totalTime = values.length / sampleRate;
-  return (crossings/2) / totalTime;
+  return [(crossings/2) / totalTime, firstCrossing, secondCrossing];
 }
 
 /**
@@ -674,7 +678,7 @@ function updateText(elementId, text)
  * @param {Uint8Array} rms1
  * @param {Uint8Array} rms2
  */
-function measurementUpdate(rms1, rms2, freq1, freq2)
+function measurementUpdate(rms1, rms2, freq1, freq2, phase)
 {
   const formatRMS = (rms) => {
     if (!Number.isFinite(rms)) return "- mV";
@@ -686,10 +690,16 @@ function measurementUpdate(rms1, rms2, freq1, freq2)
     if (freq>=1000) return (freq/1000).toFixed(2) + " kHz";
     else return freq.toFixed(2) + " Hz"
   }
-  updateText("ch1-rms", formatRMS(rms1));
-  updateText("ch2-rms", formatRMS(rms2));
-  updateText("ch1-freq", formatFreq(freq1));
-  updateText("ch2-freq", formatFreq(freq2));
+  const formatPhase = (phase) => {
+    if (!Number.isFinite(phase)) return "- °";
+    if (phase>=10) return (phase/1000).toFixed(1) + " °";
+    else return phase.toFixed(2) + " °"
+  }
+  updateText('ch1-rms', formatRMS(rms1));
+  updateText('ch2-rms', formatRMS(rms2));
+  updateText('ch1-freq', formatFreq(freq1));
+  updateText('ch2-freq', formatFreq(freq2));
+  updateText('m-phase', formatPhase(phase));
 }
 
 /**
@@ -699,48 +709,17 @@ function measurementUpdate(rms1, rms2, freq1, freq2)
  */
 function scopeMeasurements(valuesCh1, valuesCh2)
 {
-  // calculate
+  // calculate rms
   const rms1 = calcRMS(valuesCh1, valuesCh1.length, zeroVoltLevel, adcTomV);
   const rms2 = calcRMS(valuesCh2, valuesCh2.length, zeroVoltLevel, adcTomV);
-  // estimate
-  let freq1 = estimateFrequency(valuesCh1, zeroVoltLevel, sampleRateHz);
-  let freq2 = estimateFrequency(valuesCh2, zeroVoltLevel, sampleRateHz);
-  if (freq1 < 1000) {
-    const evalCh1 = new Uint8Array(valuesCh1.length*4);
-    for (let i=0; i<4; i++) evalCh1.set(valuesCh1, i*valuesCh1.length);
-    freq1 = estimateFrequency(evalCh1, zeroVoltLevel, sampleRateHz);
-  }
-  if (freq2 < 1000) {
-    const evalCh2 = new Uint8Array(valuesCh2.length*4);
-    for (let i=0; i<4; i++) evalCh2.set(valuesCh2, i*valuesCh2.length);
-    freq2 = estimateFrequency(evalCh2, zeroVoltLevel, sampleRateHz);
-  }
+  // estimate frequency
+  let [freq1, adc1z1, adc1z2] = estimateFrequency(valuesCh1, zeroVoltLevel, sampleRateHz);
+  let [freq2, adc2z1, adc2z2] = estimateFrequency(valuesCh2, zeroVoltLevel, sampleRateHz);
+  // calculate phase shift
+  const phase = 180 * ((adc2z1-adc1z1) / (adc1z2-adc1z1));
   // update
-  measurementUpdate(rms1, rms2, freq1, freq2);
+  measurementUpdate(rms1, rms2, freq1, freq2, phase);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /* THEME TOGGLE -------------------------------------------------------------------------------- */
 let isLightTheme = false;
