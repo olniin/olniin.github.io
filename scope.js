@@ -545,11 +545,10 @@ function drawGrid(width, height)
 /**
  * Draw trigger level line (scaled to CH1).
  *
- * @param {*} ctx
  * @param {*} width
  * @param {*} height
  */
-function drawTrigger(ctx, width, height)
+function drawTrigger(width, height)
 {
   const mV = (triggerLevel - zeroVoltLevel) * adcTomV;
   // clamp to visible scope area
@@ -584,6 +583,7 @@ function plotFrame(ch1, ch2) {
 
   // background grid and trigger line
   ctx.drawImage(gridCanvas, 0, 0);
+  drawTrigger(width, height);
   //drawTrigger(ctx, padding, width, height);
 
   // time scaling (ms)
