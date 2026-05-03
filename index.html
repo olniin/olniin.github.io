@@ -94,6 +94,8 @@
         <div class="input-group">
           <label>TIME SCALE</label>
           <select id="time-scale">
+            <option value=20>20 ms/div</option>
+            <option value=10>10 ms/div</option>
             <option value=5>5 ms/div</option>
             <option value=2>2 ms/div</option>
             <option value=1 selected>1 ms/div</option>
@@ -105,12 +107,13 @@
         <div class="input-group">
           <label>CHANNEL 1</label>
           <select id="ch1-scale">
+            <option value=750>750 mV/div</option>
             <option value=500>500 mV/div</option>
             <option value=250 selected>250 mV/div</option>
             <option value=100>100 mV/div</option>
             <option value=50>50 mV/div</option>
           </select>
-          <select id="ch1-type" disabled>
+          <select id="ch1-type">
             <option value=0 selected>direct</option>
             <option value=1>amplified</option>
           </select>
@@ -118,12 +121,13 @@
         <div class="input-group">
           <label>CHANNEL 2</label>
           <select id="ch2-scale">
+            <option value=750>750 mV/div</option>
             <option value=500>500 mV/div</option>
             <option value=250 selected>250 mV/div</option>
             <option value=100>100 mV/div</option>
             <option value=50>50 mV/div</option>
           </select>
-          <select id="ch2-type" disabled>
+          <select id="ch2-type">
             <option value=0 selected>direct</option>
             <option value=1>amplified</option>
           </select>
