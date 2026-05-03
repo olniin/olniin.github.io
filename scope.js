@@ -655,6 +655,8 @@ function estimateFrequency(values, zeroLine, sampleRate) {
       crossings++;
       if (crossings === 1) firstCrossing = i;
       if (crossings === 1) secondCrossing = i;
+      console.log('first',firstCrossing);
+      console.log('second',secondCrossing);
     }
   }
   // frequency = (crossings/2) / total time
