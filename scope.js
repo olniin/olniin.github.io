@@ -1,48 +1,3 @@
-/* SERIAL CONNECTION VARIABLES ----------------------------------------------------------------- */
-let baudRate = 115200;
-let port = null;
-let reader = null;
-let writer = null;
-let readLoop = null;
-let isConnected = false;
-let rxBytes = 0;
-let txBytes = 0;
-
-/* TIMING/BUFFERING VARIABLES ------------------------------------------------------------------ */
-let receiveBuffer = [];
-let lastReceiveTime = 0;
-let bufferTimeout = null;
-const MAX_BUFFER_SIZE = 65536;
-
-/* USB PROTOCOL VARIABLES ---------------------------------------------------------------------- */
-const usbMagic = [0x69, 0xF7, 0x69, 0xF7, 0x00];
-const usbHeaderSize = 16;
-const payloadTotalSize = 4096;  // includes only ADC1/2 data as 8b values
-
-/* FRAME STATE VARIABLES ----------------------------------------------------------------------- */
-let rxBuffer = [];
-let frameBuffer = null;
-let frameOffset = 0;    // no offset by default
-let expectedIndex = 0;  // first index of a frame is 0
-
-
-
-
-// ===== SCOPE DISPLAY CONSTANTS =====
-const ADC_MAX = 4095;
-const VREF = 3.3;          // set to your ADC reference / frontend scaling
-const H_DIVS = 10;         // horizontal divisions
-const V_DIVS = 8;          // vertical divisions
-
-// If you interpolate with upFactor=4 before plotting:
-const INTERP_UP = 4;
-
-// Set this to your real sample rate (before interpolation).
-// From your earlier setup, you mentioned TIM3 ~ 500 kHz triggering ADC:
-
-
-
-
 /* CHECK BROWSER SUPPORT ----------------------------------------------------------------------- */
 //if (!('serial' in navigator)) {
 //    alert('Web Serial API is not supported in this browser. Please use Chrome, Edge, or Opera.');
@@ -70,7 +25,19 @@ function forceDisconnect()
   disconnect(true);
 }
 
-/* MAIN SERIAL CONNECTION FUNCTIONS ------------------------------------------------------------ */
+/* SERIAL CONNECTION FUNCTIONS ----------------------------------------------------------------- */
+// serial connection variables
+let baudRate = 115200;
+let port = null;
+let reader = null;
+let writer = null;
+let readLoop = null;
+let isConnected = false;
+// timing / buffering variables
+const MAX_BUFFER_SIZE = 65536;
+let receiveBuffer = [];
+let lastReceiveTime = 0;
+let bufferTimeout = null;
 /**
  * Toggle serial connection.
  *
@@ -222,7 +189,100 @@ function flushReceiveBuffer()
   receiveBuffer = [];
 }
 
+/**
+ * Send commands to MCU as hex values.
+ *
+ * @returns null at failure
+ */
+async function sendHex()
+{
+  if (!isConnected || !writer) {
+    alert('Please connect to ISC Scope first!');
+    return;
+  }
+
+  const inputFreq = document.getElementById('gen-freq');
+  const inputType = document.getElementById('gen-wave');
+  const inputAttn = document.getElementById('gen-attn');
+  const inputTrig = document.getElementById('gen-trig');
+  const inputAmp1 = document.getElementById('ch1-type');
+  const inputAmp2 = document.getElementById('ch2-type');
+
+  const freq = Number.parseInt(inputFreq?.value ?? '0', 10) >>> 0;  // uint32
+  const type = Number.parseInt(inputType?.value ?? '0', 10) & 0x03; // 2 bits
+  const attn = Number.parseInt(inputAttn?.value ?? '0', 10) & 0x03; // 2 bits
+  const trig = Number.parseInt(inputTrig?.value ?? '0', 10) >>> 0;  // uint16
+
+  // clamp input frequency
+  const freqClamped = Math.min(Math.max(freq, 10), 50000) >>> 0;
+
+  // sample rate adjustment
+  if (freq <= 1000) {
+		sampleRateHz = 10000;
+	} else if (freq <= 5000) {
+		sampleRateHz = 50000;
+	} else if (freq <= 10000) {
+		sampleRateHz = 100000;
+	} else {
+		sampleRateHz = 300000;
+	}
+
+  const mode = ((type & 0x03) << 2) | (attn & 0x03);
+
+  const data = new Uint8Array([
+    0x47, 0xF7, 0xF7,
+    (trig >>>  8) & 0xFF,
+    (trig >>>  0) & 0xFF,
+    mode,
+    (freqClamped >>> 24) & 0xFF,
+    (freqClamped >>> 16) & 0xFF,
+    (freqClamped >>>  8) & 0xFF,
+    (freqClamped >>>  0) & 0xFF
+  ]);
+
+  try {
+    await writer.write(data);
+    console.log('CMD sent!', data);
+  } catch (err) {
+    console.error('Send error:', err);
+    alert('Failed to send: ' + err.message);
+  }
+}
+
+/**
+ * Update status indicator.
+ *
+ * @param {boolean} connected
+ */
+function updateStatus(connected)
+{
+  const dot = document.getElementById('statusDot'); // TODO: ADD HTML "STATUS INDICATOR"
+  const text = document.getElementById('statusText');
+  const isLightTheme = document.body.classList.contains('light');
+
+  if (connected) {
+    dot.classList.add('connected'); // TODO: ADD CSS CLASS "DOT.CONNECTED"
+    text.textContent = `Connected (${baudRate} baud)`;
+    // dark green for light theme, bright green for dark theme
+    text.style.color = isLightTheme ? '#1a7a3a' : '#2ed573';
+  } else {
+    dot.classList.remove('connected');
+    text.textContent = 'Disconnected';
+    // dark red for light theme, light gray for dark theme
+    text.style.color = isLightTheme ? '#dc3545' : '#e0e0e0';
+  }
+}
+
 /* DATA PROCESSING FUNCTIONS ------------------------------------------------------------------- */
+// USB protocol constants
+const usbMagic = [0x69, 0xF7, 0x69, 0xF7, 0x00];
+const usbHeaderSize = 16;
+const payloadTotalSize = 4096;  // includes only ADC1/2 data as 8b values
+// frame state variables
+let rxBuffer = [];
+let frameBuffer = null;
+let frameOffset = 0;            // no offset by default
+let expectedIndex = 0;          // first index of a frame is 0
 
 /**
  * Find MAGIC header from USB buffer.
@@ -359,17 +419,19 @@ function divideDataIntoChannels(frameBuf)
 }
 
 /* SCOPE DRAWING FUNCTIONS --------------------------------------------------------------------- */
-// global variable defaults
+// scope constants
 const zeroVoltLevel = 2047;
-const hardwareGainComp = 3;
+const adcTomV = (3300 / 4095) * 3.05; // (ADC ref mV) / (ADC max val) * (hardware gain comp)
 const xDivs = 10;
 const yDivs = 8;
-let triggerLevel = 2047;
-let timeMsPerDiv = 1;
-let ch1mVPerDiv = 250;
-let ch2mVPerDiv = 250;
+// scope & canvas variables
+let canvas, ctx;
 let isRunning = true;
+let triggerLevel = 2047;
 let sampleRateHz = 10000;
+let timeMsPerDiv = 1;
+let ch1ScaleFactor, ch2ScaleFactor;
+let padding = 10;
 
 /**
  * Update the value of triggerLevel upon change.
@@ -391,17 +453,24 @@ function updateScopeScales()
   const ch2Sel = document.getElementById('ch2-scale');
 
   if (timeSel) timeMsPerDiv = Number(timeSel.value);  // ms/div
-  if (ch1Sel) ch1mVPerDiv = Number(ch1Sel.value);     // mV/div
-  if (ch2Sel) ch2mVPerDiv = Number(ch2Sel.value);     // mV/div
+  // calculate voltage scales
+  const yPixelsPerDiv = (canvas.height - 2*padding) / yDivs;
+  if (ch1Sel) ch1ScaleFactor = yPixelsPerDiv / Number(ch1Sel.value);
+  if (ch2Sel) ch2ScaleFactor = yPixelsPerDiv / Number(ch2Sel.value);
 }
 
-// update selections on load
+/**
+ * Update variables on load & add hooks.
+ */
 window.addEventListener('DOMContentLoaded', () => {
-  updateScopeScales();
+  canvas = document.getElementById('screen');
+  ctx = canvas.getContext('2d');
 
   document.getElementById('time-scale')?.addEventListener('change', updateScopeScales);
   document.getElementById('ch1-scale')?.addEventListener('change', updateScopeScales);
   document.getElementById('ch2-scale')?.addEventListener('change', updateScopeScales);
+  // also update scale selections
+  updateScopeScales();
 });
 
 
@@ -420,17 +489,13 @@ function toggleDisplayUpdate()
 /**
  * Draw the oscilloscope background grid.
  *
- * @param {*} ctx
- * @param {*} padding
  * @param {*} width
  * @param {*} height
  */
-function drawGrid(ctx, padding, width, height)
+function drawGrid(width, height)
 {
-  const drawWidth = width - 2 * padding;
-  const drawHeight = height - 2 * padding;
-  const xStep = drawWidth / xDivs;
-  const yStep = drawHeight / yDivs;
+  const xStep = (width - 2 * padding) / xDivs;
+  const yStep = (height - 2 * padding) / yDivs;
 
   ctx.save();
 
@@ -476,15 +541,10 @@ function drawGrid(ctx, padding, width, height)
  * @returns null
  */
 function plotFrame(ch1, ch2) {
-  if (!isRunning) return;
+  if (!isRunning || !canvas || !ctx) return;
 
-  const canvas = document.getElementById("screen");
-  const ctx = canvas.getContext("2d");
   const width = canvas.width;
   const height = canvas.height;
-  const padding = 10;
-  const drawWidth = width - 2*padding;
-  const drawHeight = height - 2*padding;
 
   // background grid and trigger line
   drawGrid(ctx, padding, width, height);
@@ -494,13 +554,7 @@ function plotFrame(ch1, ch2) {
   const totalTime = timeMsPerDiv * xDivs;
   const samplesPerScreen = Math.floor((sampleRateHz * totalTime) / 1000);
   const visibleSamples = Math.min(samplesPerScreen, ch1.length);  // in case not enough data
-  const xStep = drawWidth / visibleSamples;
-
-  // voltage scaling
-  const adcTomV = (3300 / 4096) * hardwareGainComp; // scale
-  const yPixelsPerDiv = drawHeight / yDivs;
-  const ch1ScaleFactor = yPixelsPerDiv / ch1mVPerDiv;
-  const ch2ScaleFactor = yPixelsPerDiv / ch2mVPerDiv;
+  const xStep = (width - 2*padding) / visibleSamples;
 
   // draw ch1 data
   ctx.save();
@@ -554,87 +608,6 @@ function plotFrame(ch1, ch2) {
 
 
 
-/**
- * Send commands to MCU as hex values.
- *
- * @returns null at failure
- */
-async function sendHex()
-{
-  if (!isConnected || !writer) {
-    alert('Please connect to ISC Scope first!');
-    return;
-  }
-
-  const inputFreq = document.getElementById('gen-freq');
-  const inputType = document.getElementById('gen-wave');
-  const inputAttn = document.getElementById('gen-attn');
-  const inputTrig = document.getElementById('gen-trig');
-
-  const freq = Number.parseInt(inputFreq?.value ?? '0', 10) >>> 0;  // uint32
-  const type = Number.parseInt(inputType?.value ?? '0', 10) & 0x03; // 2 bits
-  const attn = Number.parseInt(inputAttn?.value ?? '0', 10) & 0x03; // 2 bits
-  const trig = Number.parseInt(inputTrig?.value ?? '0', 10) >>> 0;  // uint16
-
-  // clamp input frequency
-  const freqClamped = Math.min(Math.max(freq, 10), 50000) >>> 0;
-
-  // sample rate adjustment
-  if (freq <= 1000) {
-		sampleRateHz = 10000;
-	} else if (freq <= 5000) {
-		sampleRateHz = 50000;
-	} else if (freq <= 10000) {
-		sampleRateHz = 100000;
-	} else {
-		sampleRateHz = 300000;
-	}
-
-  const mode = ((type & 0x03) << 2) | (attn & 0x03);
-
-  const data = new Uint8Array([
-    0x47, 0xF7, 0xF7,
-    (trig >>>  8) & 0xFF,
-    (trig >>>  0) & 0xFF,
-    mode,
-    (freqClamped >>> 24) & 0xFF,
-    (freqClamped >>> 16) & 0xFF,
-    (freqClamped >>>  8) & 0xFF,
-    (freqClamped >>>  0) & 0xFF
-  ]);
-
-  try {
-    await writer.write(data);
-    console.log('CMD sent!', data);
-  } catch (err) {
-    console.error('Send error:', err);
-    alert('Failed to send: ' + err.message);
-  }
-}
-
-/**
- * Update status indicator.
- *
- * @param {boolean} connected
- */
-function updateStatus(connected)
-{
-  const dot = document.getElementById('statusDot'); // TODO: ADD HTML "STATUS INDICATOR"
-  const text = document.getElementById('statusText');
-  const isLightTheme = document.body.classList.contains('light');
-
-  if (connected) {
-    dot.classList.add('connected'); // TODO: ADD CSS CLASS "DOT.CONNECTED"
-    text.textContent = `Connected (${baudRate} baud)`;
-    // dark green for light theme, bright green for dark theme
-    text.style.color = isLightTheme ? '#1a7a3a' : '#2ed573';
-  } else {
-    dot.classList.remove('connected');
-    text.textContent = 'Disconnected';
-    // dark red for light theme, light gray for dark theme
-    text.style.color = isLightTheme ? '#dc3545' : '#e0e0e0';
-  }
-}
 
 /* THEME TOGGLE -------------------------------------------------------------------------------- */
 let isLightTheme = false;
