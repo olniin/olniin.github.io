@@ -778,6 +778,7 @@ function toggleTheme()
   document.getElementById('themeIcon').textContent  = isLightTheme ? '☀️' : '🌙';
   document.getElementById('themeLabel').textContent = isLightTheme ? 'Light' : 'Dark';
   try {localStorage.setItem('ISCscope-theme', isLightTheme ? 'light' : 'dark');} catch(e) {}
-  // refresh connection status colors immediately
+  // refresh colors immediately
+  drawGrid(canvas.width, canvas.height);
   updateStatus(isConnected);
 }
