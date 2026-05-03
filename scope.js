@@ -341,11 +341,13 @@ function divideDataIntoChannels(frameBuf)
   let channelIndex = 0;
   // data is formatted - [CH1_H, CH1_L, CH2_H, CH2_L, ...]
   for (let i=0; i<frameBuf.length; i+=4) {
+    if (i!==1008 || i!==2016 || i!==3024) {
     let val1 = (frameBuf[i] << 8) | frameBuf[i + 1];
     let val2 = (frameBuf[i + 2] << 8) | frameBuf[i + 3];
     ch1Values[channelIndex] = val1;
     ch2Values[channelIndex] = val2;
     channelIndex++;
+    }
   }
   console.log("CH1:", ch1Values);
   console.log("CH2:", ch2Values);
