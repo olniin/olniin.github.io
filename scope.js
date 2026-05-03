@@ -543,6 +543,33 @@ function drawGrid(width, height)
 }
 
 /**
+ * Draw trigger level line (scaled to CH1).
+ *
+ * @param {*} ctx
+ * @param {*} width
+ * @param {*} height
+ */
+function drawTrigger(ctx, width, height)
+{
+  const mV = (triggerLevel - zeroVoltLevel) * adcTomV;
+  // clamp to visible scope area
+  const clampedY = Math.max(padding, Math.min(height-padding, (height/2) - (mV*ch1ScaleFactor)));
+
+  ctx.save();
+  // dashed trigger line
+  ctx.strokeStyle = "#ff0088";
+  ctx.lineWidth = 1.2;
+  ctx.setLineDash([16, 8]);
+
+  ctx.beginPath();
+  ctx.moveTo(padding, clampedY);
+  ctx.lineTo(width-padding, clampedY);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
  * Plot full scope frame.
  *
  * @param {Uint8Array} ch1 readings from ADC1
@@ -573,7 +600,7 @@ function plotFrame(ch1, ch2) {
   for (let i=0; i<visibleSamples; i++) {
     const x = padding + i*xStep;
     const mV = (ch1[i]-zeroVoltLevel) * adcTomV;
-    const y = Math.max(padding, Math.min(height - padding, (height / 2) - (mV * ch1ScaleFactor)));
+    const y = Math.max(padding, Math.min(height-padding, (height/2) - (mV*ch1ScaleFactor)));
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
@@ -589,7 +616,7 @@ function plotFrame(ch1, ch2) {
   for (let i=0; i<visibleSamples; i++) {
     const x = padding + i*xStep;
     const mV = (ch2[i] - zeroVoltLevel) * adcTomV;
-    const y = Math.max(padding, Math.min(height - padding, (height / 2) - (mV * ch2ScaleFactor)));
+    const y = Math.max(padding, Math.min(height-padding, (height/2) - (mV*ch2ScaleFactor)));
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
