@@ -65,7 +65,7 @@ async function toggleConnection()
       writer = port.writable.getWriter();
       reader = port.readable.getReader();
       isConnected = true;
-      btn.textContent='DISCON';
+      btn.textContent='DISCONNECT';
       btn.classList.add('active');  // TODO: ADD CSS CLASS "ACTIVE"
       updateStatus(true);
       showTimeoutWarning(false);
