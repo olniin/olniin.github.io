@@ -282,6 +282,7 @@ function processReceivedData(data)
                       (rxBuffer[12] << 8) |
                       (rxBuffer[13]);
     const payloadLen = (rxBuffer[14] << 8) | (rxBuffer[15]);
+    console.log(packetIndex);
     console.log(payloadLen);
     const packetSize = usbHeaderSize + payloadLen;
 
@@ -305,6 +306,7 @@ function processReceivedData(data)
 
       if (expectedIndex === 5) {  // frame complete
         if (frameOffset === payloadTotalSize) {
+          console.log("FULL frame:", frameBuffer);
           divideDataIntoChannels(frameBuffer);
         } else {
           console.warn("Frame size mismatch:", frameOffset);
@@ -322,7 +324,7 @@ function processReceivedData(data)
     }
 
     // remove processed packet from the ring buffer
-    rxBuffer = rxBuffer.slice(packetSize-4);
+    rxBuffer = rxBuffer.slice(packetSize);
   }
 }
 
@@ -341,13 +343,11 @@ function divideDataIntoChannels(frameBuf)
   let channelIndex = 0;
   // data is formatted - [CH1_H, CH1_L, CH2_H, CH2_L, ...]
   for (let i=0; i<frameBuf.length; i+=4) {
-    if (i!==1008 || i!==2016 || i!==3024) {
     let val1 = (frameBuf[i] << 8) | frameBuf[i + 1];
     let val2 = (frameBuf[i + 2] << 8) | frameBuf[i + 3];
     ch1Values[channelIndex] = val1;
     ch2Values[channelIndex] = val2;
     channelIndex++;
-    }
   }
   console.log("CH1:", ch1Values);
   console.log("CH2:", ch2Values);
