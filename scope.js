@@ -431,7 +431,7 @@ let isRunning = true;
 let triggerLevel = 2047;
 let sampleRateHz = 10000;
 let timeMsPerDiv = 1;
-let ch1ScaleFactor, ch2ScaleFactor;
+let samplesPerScreen, ch1ScaleFactor, ch2ScaleFactor;
 let padding = 10;
 
 /**
@@ -453,7 +453,8 @@ function updateScopeScales()
   const ch1Sel = document.getElementById('ch1-scale');
   const ch2Sel = document.getElementById('ch2-scale');
 
-  if (timeSel) timeMsPerDiv = Number(timeSel.value);  // ms/div
+  // calculate amount of samples on the screen
+  if (timeSel) samplesPerScreen = Math.floor((sampleRateHz*Number(timeSel.value)*xDivs) / 1000);
   // calculate voltage scales
   const yPixelsPerDiv = (canvas.height - 2*padding) / yDivs;
   if (ch1Sel) ch1ScaleFactor = yPixelsPerDiv / Number(ch1Sel.value);
@@ -557,9 +558,8 @@ function plotFrame(ch1, ch2) {
   //drawTrigger(ctx, padding, width, height);
 
   // time scaling (ms)
-  const totalTime = timeMsPerDiv * xDivs;
-  const samplesPerScreen = Math.floor((sampleRateHz * totalTime) / 1000);
   const visibleSamples = Math.min(samplesPerScreen, ch1.length);  // in case not enough data
+  if (visibleSamples === 0) return;
   const xStep = (width - 2*padding) / visibleSamples;
 
   // draw ch1 data
@@ -568,13 +568,12 @@ function plotFrame(ch1, ch2) {
   ctx.lineWidth = 1.5;
   ctx.beginPath();
 
-  let x = padding;
   for (let i=0; i<visibleSamples; i++) {
+    const x = padding + i*xStep;
     const mV = (ch1[i]-zeroVoltLevel) * adcTomV;
-    const y = (height/2) - (mV*ch1ScaleFactor);
+    const y = Math.max(padding, Math.min(height - padding, (height / 2) - (mV * ch1ScaleFactor)));
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
-    x += xStep;
   }
   ctx.stroke();
   ctx.restore();
@@ -585,17 +584,15 @@ function plotFrame(ch1, ch2) {
   ctx.lineWidth = 1.5;
   ctx.beginPath();
 
-  x = padding;
   for (let i=0; i<visibleSamples; i++) {
+    const x = padding + i*xStep;
     const mV = (ch2[i] - zeroVoltLevel) * adcTomV;
-    const y = (height / 2) - (mV * ch2ScaleFactor);
+    const y = Math.max(padding, Math.min(height - padding, (height / 2) - (mV * ch2ScaleFactor)));
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
-    x += xStep;
   }
   ctx.stroke();
   ctx.restore();
-  console.log("DRAWING DONE", ch1, ch2);
 }
 
 
