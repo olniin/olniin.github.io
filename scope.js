@@ -654,7 +654,7 @@ function estimateFrequency(values, zeroLine, sampleRate) {
         (values[i] < zeroLine && values[i-1] >= zeroLine)) {
       crossings++;
       if (crossings === 1) firstCrossing = i;
-      if (crossings === 1) secondCrossing = i;
+      if (crossings === 2) secondCrossing = i;
       console.log('first',firstCrossing);
       console.log('second',secondCrossing);
     }
