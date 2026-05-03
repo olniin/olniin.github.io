@@ -50,12 +50,14 @@
       <div class="panel scope-data">
         <label>READINGS</label><label></label>
         <div class="results-group">
-          <label>CH1</label>
-          <label id="ch1-volts">-</label>
-          <label>CH2</label>
-          <label id="ch2-volts">-</label>
-          <label>Frequency</label>
-          <label id="m-freq">-</label>
+          <label>CH1 RMS</label>
+          <label id="ch1-rms">-</label>
+          <label>CH2 RMS</label>
+          <label id="ch2-rms">-</label>
+          <label>CH1 Frequency</label>
+          <label id="ch1-freq">-</label>
+          <label>CH2 Frequency</label>
+          <label id="ch2-freq">-</label>
           <label>Phase</label>
           <label id="m-phase">-</label>
         </div>
@@ -112,7 +114,7 @@
             <option value=100>100 mV/div</option>
             <option value=50>50 mV/div</option>
           </select>
-          <select id="ch1-type">
+          <select id="ch1-type" onchange="sendHex()">
             <option value=0 selected>direct</option>
             <option value=1>amplified</option>
           </select>
@@ -126,7 +128,7 @@
             <option value=100>100 mV/div</option>
             <option value=50>50 mV/div</option>
           </select>
-          <select id="ch2-type">
+          <select id="ch2-type" onchange="sendHex()">
             <option value=0 selected>direct</option>
             <option value=1>amplified</option>
           </select>

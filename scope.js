@@ -344,8 +344,6 @@ function processReceivedData(data)
                       (rxBuffer[12] << 8) |
                       (rxBuffer[13]);
     const payloadLen = (rxBuffer[14] << 8) | (rxBuffer[15]);
-    console.log(packetIndex);
-    console.log(payloadLen);
     const packetSize = usbHeaderSize + payloadLen;
 
     // packet not full
@@ -365,11 +363,9 @@ function processReceivedData(data)
       frameBuffer.set(payload, frameOffset);
       frameOffset += payloadLen;
       expectedIndex++;
-      console.log("FRAME ADDED! new offset, expectedIndex", frameOffset, expectedIndex);
-
+      
       if (expectedIndex === 5) {  // frame complete
         if (frameOffset === payloadTotalSize) {
-          console.log("FULL frame:", frameBuffer);
           divideDataIntoChannels(frameBuffer);
         } else {
           console.warn("Frame size mismatch:", frameOffset);
@@ -412,11 +408,6 @@ function divideDataIntoChannels(frameBuf)
     ch2Values[channelIndex] = val2;
     channelIndex++;
   }
-  console.log("CH1:", ch1Values);
-  console.log("CH2:", ch2Values);
-
-  // Pass to next stage (renderer / processing)
-  //handleChannels(ch1, ch2);
   plotFrame(ch1Values, ch2Values);
 }
 
@@ -591,6 +582,9 @@ function plotFrame(ch1, ch2) {
   if (visibleSamples === 0) return;
   const xStep = (width - 2*padding) / visibleSamples;
 
+  // calculate data
+  measureAndUpdate(ch1, ch2, visibleSamples);
+
   // draw ch1 data
   ctx.save();
   ctx.strokeStyle = "#94b1ff";
@@ -624,6 +618,169 @@ function plotFrame(ch1, ch2) {
   ctx.restore();
 }
 
+
+
+
+
+
+
+
+
+
+
+/* -------------------- MEASUREMENTS (RMS / FREQ / PHASE) -------------------- */
+
+const MEAS_EVERY_N_FRAMES = 3;   // don’t compute every draw; saves CPU
+let _measFrameCounter = 0;
+
+function wrap180(deg) {
+  deg = ((deg + 180) % 360 + 360) % 360 - 180;
+  return deg;
+}
+
+/**
+ * Compute AC RMS in mV (signal centred around zeroVoltLevel).
+ * RMS = sqrt(mean(x^2))  [4](https://www.geeksforgeeks.org/javascript/rms-value-of-array-in-javascript/)
+ */
+function computeRmsMv(adc, offsetCounts, mvPerCount, start = 0, n = adc.length) {
+  let sumSq = 0.0;
+  const end = Math.min(adc.length, start + n);
+
+  for (let i = start; i < end; i++) {
+    const xMv = (adc[i] - offsetCounts) * mvPerCount;
+    sumSq += xMv * xMv;
+  }
+  const N = Math.max(1, end - start);
+  return Math.sqrt(sumSq / N);
+}
+
+/**
+ * Estimate frequency using rising zero-crossings with linear interpolation.
+ * Count crossings over the window, average period. [1](https://www.raymaps.com/index.php/frequency-estimation-using-zero-crossing-method/)
+ *
+ * Returns { freqHz, crossings } where crossings is an array of fractional sample indices.
+ */
+function estimateFreqZeroCross(adc, sampleRateHz, offsetCounts, start = 0, n = adc.length) {
+  const end = Math.min(adc.length, start + n);
+  const crossings = [];
+
+  // small hysteresis in ADC counts to reduce chatter around zero
+  const HYST = 6; // tweak based on noise; 0 disables
+
+  let prev = adc[start] - offsetCounts;
+
+  for (let i = start + 1; i < end; i++) {
+    const cur = adc[i] - offsetCounts;
+
+    // Rising crossing: prev < -HYST and cur >= +HYST
+    if (prev < -HYST && cur >= HYST) {
+      // Linear interpolation of zero crossing between i-1 and i:
+      // prev + t*(cur-prev) = 0 => t = prev / (prev - cur)
+      const t = prev / (prev - cur);           // 0..1
+      const idx = (i - 1) + t;                 // fractional sample index
+      crossings.push(idx);
+    }
+
+    prev = cur;
+  }
+
+  if (crossings.length < 2) return { freqHz: NaN, crossings };
+
+  // Average period in samples
+  let sumPeriod = 0.0;
+  for (let k = 1; k < crossings.length; k++) {
+    sumPeriod += (crossings[k] - crossings[k - 1]);
+  }
+  const avgPeriodSamples = sumPeriod / (crossings.length - 1);
+  const freqHz = sampleRateHz / avgPeriodSamples;
+
+  return { freqHz, crossings };
+}
+
+/**
+ * Estimate phase (deg) between two channels using zero-crossing time delay.
+ * phi = 360 * f * dt, wrapped to [-180..180]. [2](https://sengpielaudio.com/calculator-timedelayphase.htm)[3](https://support.dewesoft.com/en/support/solutions/articles/14000086629-calculating-the-time-delay-between-two-signals-using-correlation-math)
+ *
+ * We use a crossing near the middle of the window to reduce edge effects.
+ */
+function estimatePhaseDegFromCrossings(cross1, cross2, sampleRateHz, freqHz) {
+  if (!Number.isFinite(freqHz) || cross1.length === 0 || cross2.length === 0) return NaN;
+
+  // pick the crossing closest to the middle index (more stable than the first crossing)
+  const mid1 = cross1[Math.floor(cross1.length / 2)];
+  const mid2 = cross2[Math.floor(cross2.length / 2)];
+
+  const dt = (mid2 - mid1) / sampleRateHz;      // seconds (ch2 relative to ch1)
+  const phaseDeg = wrap180(360.0 * freqHz * dt);
+  return phaseDeg;
+}
+
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+/**
+ * Update UI labels.
+ */
+function updateReadingsUI({ ch1RmsMv, ch2RmsMv, ch1FreqHz, ch2FreqHz, phaseDeg }) {
+  // RMS: show as V if >= 1000 mV else mV
+  const fmtRms = (mv) => {
+    if (!Number.isFinite(mv)) return "-";
+    if (mv >= 1000) return (mv / 1000).toFixed(3) + " V";
+    return mv.toFixed(1) + " mV";
+  };
+
+  const fmtFreq = (hz) => {
+    if (!Number.isFinite(hz)) return "-";
+    if (hz >= 1000) return (hz / 1000).toFixed(2) + " kHz";
+    return hz.toFixed(2) + " Hz";
+  };
+
+  const fmtPhase = (deg) => {
+    if (!Number.isFinite(deg)) return "-";
+    return deg.toFixed(1) + "°";
+  };
+
+  setText("ch1-rms", fmtRms(ch1RmsMv));
+  setText("ch2-rms", fmtRms(ch2RmsMv));
+  setText("ch1-freq", fmtFreq(ch1FreqHz));
+  setText("ch2-freq", fmtFreq(ch2FreqHz));
+  setText("m-phase", fmtPhase(phaseDeg));
+}
+
+/**
+ * Compute and update measurements (throttled).
+ * Call this from plotFrame() after you’ve established visibleSamples.
+ */
+function measureAndUpdate(ch1, ch2, visibleSamples) {
+  _measFrameCounter++;
+  if ((_measFrameCounter % MEAS_EVERY_N_FRAMES) !== 0) return;
+
+  // Use the same scale conversion you use for drawing
+  const mvPerCount = (3300 / 4096) * hardwareGainComp; // mV per ADC count (with your comp)
+
+  // RMS on the visible window (AC RMS about zeroVoltLevel)
+  const ch1RmsMv = computeRmsMv(ch1, zeroVoltLevel, mvPerCount, 0, visibleSamples);
+  const ch2RmsMv = computeRmsMv(ch2, zeroVoltLevel, mvPerCount, 0, visibleSamples);
+
+  // Frequency by zero-crossing (fast, good for clean-ish waveforms) [1](https://www.raymaps.com/index.php/frequency-estimation-using-zero-crossing-method/)
+  const f1 = estimateFreqZeroCross(ch1, sampleRateHz, zeroVoltLevel, 0, visibleSamples);
+  const f2 = estimateFreqZeroCross(ch2, sampleRateHz, zeroVoltLevel, 0, visibleSamples);
+
+  const ch1FreqHz = f1.freqHz;
+  const ch2FreqHz = f2.freqHz;
+
+  // Phase: use avg of the two freqs if both valid; else fall back
+  const freqForPhase =
+    (Number.isFinite(ch1FreqHz) && Number.isFinite(ch2FreqHz)) ? (0.5 * (ch1FreqHz + ch2FreqHz)) :
+    (Number.isFinite(ch1FreqHz) ? ch1FreqHz :
+    (Number.isFinite(ch2FreqHz) ? ch2FreqHz : NaN));
+
+  const phaseDeg = estimatePhaseDegFromCrossings(f1.crossings, f2.crossings, sampleRateHz, freqForPhase);
+
+  updateReadingsUI({ ch1RmsMv, ch2RmsMv, ch1FreqHz, ch2FreqHz, phaseDeg });
+}
 
 
 
