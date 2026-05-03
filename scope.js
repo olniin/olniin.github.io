@@ -646,22 +646,54 @@ function calcRMS(values, len, offset, mvPerADCCount)
  */
 function estimateFrequency(values, zeroLine, sampleRate) {
   let crossings = 0;
-  let firstCrossing = 0;
-  let secondCrossing = 0;
   for (let i=1; i<values.length; i++) {
     // check if the signal crossed the zero line
     if ((values[i] >= zeroLine && values[i-1] < zeroLine) ||
         (values[i] < zeroLine && values[i-1] >= zeroLine)) {
       crossings++;
-      if (crossings === 1) firstCrossing = i;
-      if (crossings === 2) secondCrossing = i;
-      console.log('first',firstCrossing);
-      console.log('second',secondCrossing);
     }
   }
   // frequency = (crossings/2) / total time
   const totalTime = values.length / sampleRate;
-  return [(crossings/2) / totalTime, firstCrossing, secondCrossing];
+  return (crossings/2) / totalTime;
+}
+
+/**
+ * Calculate phase shift between 2 signals.
+ * @param {Uint8Array} signalA - first signal
+ * @param {Uint8Array} signalB - second signal
+ * @param {Number} frequency - signal frequency
+ * @param {Number} sampleRate - sample rate
+ * @returns {Number} - phase shift in degrees
+ */
+function calculatePhaseShift(signalA, signalB, frequency, sampleRate) {
+  const n = signalA.length;
+  let maxCorrelation = -Infinity;
+  let sampleDelay = 0;
+
+  // search for best match by shifting signal B (lag), while
+  // limiting search to one period
+  const periodInSamples = Math.floor(sampleRate / frequency);
+  const searchRange = Math.min(n, periodInSamples);
+
+  for (let lag=-searchRange; lag<searchRange; lag++) {
+    let correlation = 0;
+    for (let i=0; i<n; i++) {
+      const j = i + lag;
+      if (j >= 0 && j < n) {
+        correlation += signalA[i] * signalB[j];
+      }
+    }
+    if (correlation > maxCorrelation) {
+      maxCorrelation = correlation;
+      sampleDelay = lag;
+    }
+  }
+
+  // calculate time delay and phaseshift
+  const phaseShiftDegrees = (sampleDelay / periodInSamples) * 360;
+
+  return phaseShiftDegrees * -1;
 }
 
 /**
@@ -714,11 +746,10 @@ function scopeMeasurements(valuesCh1, valuesCh2)
   // calculate rms
   const rms1 = calcRMS(valuesCh1, valuesCh1.length, zeroVoltLevel, adcTomV);
   const rms2 = calcRMS(valuesCh2, valuesCh2.length, zeroVoltLevel, adcTomV);
-  // estimate frequency
-  let [freq1, adc1z1, adc1z2] = estimateFrequency(valuesCh1, zeroVoltLevel, sampleRateHz);
-  let [freq2, adc2z1, adc2z2] = estimateFrequency(valuesCh2, zeroVoltLevel, sampleRateHz);
-  // calculate phase shift
-  const phase = 180 * ((adc2z1-adc1z1) / (adc1z2-adc1z1));
+  // estimate frequency and phase
+  const freq1 = estimateFrequency(valuesCh1, zeroVoltLevel, sampleRateHz);
+  const freq2 = estimateFrequency(valuesCh2, zeroVoltLevel, sampleRateHz);
+  const phase = calculatePhaseShift(valuesCh1, valuesCh2, freq1, sampleRateHz);
   // update
   measurementUpdate(rms1, rms2, freq1, freq2, phase);
 }
