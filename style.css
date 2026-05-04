@@ -126,6 +126,11 @@ main {
   margin: 0px 0px 0px 10px;
 }
 
+.input-group {
+  display: grid;
+  grid-template-rows: 1fr 1fr 1fr 1fr;
+}
+
 /* SCOPE SCREEN -------------------------------------------------------------------------------- */
 canvas {
   display: block;
