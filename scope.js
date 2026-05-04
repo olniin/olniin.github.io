@@ -422,7 +422,7 @@ let gridCanvas, gridCtx;
 let canvas, ctx;
 let isRunning = true;
 let triggerLevel = 2047;
-let sampleRateHz = 10000;
+let sampleRateHz = 50000;
 let timeMsPerDiv = 1;
 let samplesPerScreen, ch1ScaleFactor, ch2ScaleFactor;
 let padding = 10;
