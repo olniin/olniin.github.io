@@ -1,3 +1,3 @@
-## Web UI for and MCU based Scope
+## Web UI for an MCU based Scope
 
 This is a test site.
