@@ -1,8 +1,7 @@
 /* CHECK BROWSER SUPPORT ----------------------------------------------------------------------- */
-//if (!('serial' in navigator)) {
-//    alert('Web Serial API is not supported in this browser. Please use Chrome, Edge, or Opera.');
-// TODO: ADD HTML WARNING
-//}
+if (!('serial' in navigator)) {
+  alert('Web Serial API is not supported in this browser. Please use Chrome, Edge, or Opera.');
+}
 
 /* SERIAL TIMEOUT ------------------------------------------------------------------------------ */
 /**
