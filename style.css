@@ -86,21 +86,20 @@ button:hover {
 /* SCOPE MAIN STRUCTURE ------------------------------------------------------------------------ */
 main {
   display: grid;
-  grid-template-columns: 1fr 250px;
+  grid-template-columns: minmax(250px, 1fr) 250px;
 }
 
 .scope-main {
-  display: grid;
-  grid-template-rows: 4fr 1fr;
+  display: flex;
+  flex-direction: column;
 }
 
 .scope-side {
-  display: grid;
-  grid-template-rows: 1fr 9fr;
+  display: flex;
+  flex-direction: column;
 }
 
 .panel {
-  align-items: center;
   background-color: var(--panel-bg);
   border: 2px solid var(--panel-border);
   border-radius: 10px;
@@ -120,16 +119,14 @@ main {
 }
 
 .scope-connect {
+  height: min-content;
   margin: 0px 0px 10px 10px;
   text-align: center;
 }
 
 .scope-settings {
+  flex: 1;
   margin: 0px 0px 0px 10px;
-}
-
-.input-group {
-  display: block;
 }
 
 /* SCOPE SCREEN -------------------------------------------------------------------------------- */
@@ -161,7 +158,10 @@ canvas {
 }
 
 .input-group {
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   background-color: var(--panel-bg);
   color: var(--body-text);
   font-size: 12px;
