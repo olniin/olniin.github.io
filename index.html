@@ -76,8 +76,10 @@
         </div>
         <div class="input-group">
           <label>GENERATOR</label>
-          <input type="number" id="gen-freq" value="1000" min="10" step="1" max="50000" onchange="sendHex()" onkeypress="if(event.key==='Enter') {event.target.blur();sendHex();}">
-          <label>Hz</label>
+          <div>
+            <input type="number" id="gen-freq" value="1000" min="10" step="1" max="50000" onchange="sendHex()" onkeypress="if(event.key==='Enter') {event.target.blur();sendHex();}">
+            <label>Hz</label>
+          </div>
           <select id="gen-wave" onchange="sendHex()">
             <option value=0 selected>Sine</option>
             <option value=1>Triangle</option>

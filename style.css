@@ -127,8 +127,7 @@ main {
 }
 
 .input-group {
-  display: grid;
-  grid-template-rows: 1fr 1fr 1fr 1fr;
+  display: block;
 }
 
 /* SCOPE SCREEN -------------------------------------------------------------------------------- */
