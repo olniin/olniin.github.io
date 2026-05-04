@@ -108,6 +108,8 @@ main {
 }
 
 .screen-area {
+  height: min(56vh, 530px);
+  min-height: 290px;
   margin: 0px 0px 5px 0px;
 }
 
