@@ -580,7 +580,7 @@ function plotFrame(ch1, ch2) {
   // time scaling (ms)
   const visibleSamples = Math.min(samplesPerScreen, ch1.length);  // in case not enough data
   if (visibleSamples === 0) return;
-  const xStep = (width - 2*padding) / visibleSamples;
+  const xStep = (width - 2*padding) / (visibleSamples-1); // -1 because between x values is x-1 divs
 
   // calculate data
   scopeMeasurements(ch1, ch2);

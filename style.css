@@ -86,12 +86,12 @@ button:hover {
 /* SCOPE MAIN STRUCTURE ------------------------------------------------------------------------ */
 main {
   display: grid;
-  grid-template-columns: 1fr 230px;
+  grid-template-columns: 1fr 250px;
 }
 
 .scope-main {
   display: grid;
-  grid-template-rows: 8fr 3fr;
+  grid-template-rows: 4fr 1fr;
 }
 
 .scope-side {
