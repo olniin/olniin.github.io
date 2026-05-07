@@ -6,7 +6,6 @@ if (!('serial' in navigator)) {
 /* SERIAL TIMEOUT ------------------------------------------------------------------------------ */
 /**
  * Show timeout warning.
- *
  * @param {boolean} show - true or false
  */
 function showTimeoutWarning(show)
@@ -25,6 +24,7 @@ function forceDisconnect()
 }
 
 /* SERIAL CONNECTION FUNCTIONS ----------------------------------------------------------------- */
+// uses Aleksei Tertychnyi's JavaScript Web Serial functions
 // serial connection variables
 let baudRate = 115200;
 let port = null;
@@ -37,10 +37,9 @@ const MAX_BUFFER_SIZE = 65536;
 let receiveBuffer = [];
 let lastReceiveTime = 0;
 let bufferTimeout = null;
+
 /**
  * Toggle serial connection.
- *
- * @returns null if baud rate out of range
  */
 async function toggleConnection()
 {
@@ -65,10 +64,10 @@ async function toggleConnection()
       reader = port.readable.getReader();
       isConnected = true;
       btn.textContent='DISCONNECT';
-      btn.classList.add('active');  // TODO: ADD CSS CLASS "ACTIVE"
+      btn.classList.add('active');
       updateStatus(true);
       showTimeoutWarning(false);
-      readLoop = readData();  // TODO: ???
+      readLoop = readData();
     } catch (err) {
       console.error('Connection error:', err);
       // skip alert if user cancelled port selection
@@ -82,7 +81,6 @@ async function toggleConnection()
 
 /**
  * Disconnect serial port.
- *
  * @param {boolean} force - true or false -> force disconnect?
  */
 async function disconnect(force=false)
@@ -176,8 +174,6 @@ async function readData()
 
 /**
  * Flush receive buffer.
- *
- * @returns null if receive buffer is empty
  */
 function flushReceiveBuffer()
 {
@@ -190,8 +186,6 @@ function flushReceiveBuffer()
 
 /**
  * Send commands to MCU as hex values.
- *
- * @returns null at failure
  */
 async function sendHex()
 {
@@ -248,21 +242,21 @@ async function sendHex()
     console.error('Send error:', err);
     alert('Failed to send: ' + err.message);
   }
+  updateScopeScales();
 }
 
 /**
  * Update status indicator.
- *
  * @param {boolean} connected
  */
 function updateStatus(connected)
 {
-  const dot = document.getElementById('statusDot'); // TODO: ADD HTML "STATUS INDICATOR"
+  const dot = document.getElementById('statusDot');
   const text = document.getElementById('statusText');
   const isLightTheme = document.body.classList.contains('light');
 
   if (connected) {
-    dot.classList.add('connected'); // TODO: ADD CSS CLASS "DOT.CONNECTED"
+    dot.classList.add('connected');
     text.textContent = `Connected (${baudRate} baud)`;
     // dark green for light theme, bright green for dark theme
     text.style.color = isLightTheme ? '#1a7a3a' : '#2ed573';
@@ -278,7 +272,7 @@ function updateStatus(connected)
 // USB protocol constants
 const usbMagic = [0x69, 0xF7, 0x69, 0xF7, 0x00];
 const usbHeaderSize = 16;
-const payloadTotalSize = 4096;  // includes only ADC1/2 data as 8b values
+const payloadTotalSize = 4096;  // only ADC1/2 data as 8b values
 // frame state variables
 let rxBuffer = [];
 let frameBuffer = null;
@@ -287,9 +281,8 @@ let expectedIndex = 0;          // first index of a frame is 0
 
 /**
  * Find MAGIC header from USB buffer.
- *
- * @param {Array} buffer data in buffer
- * @returns index of first MAGIC byte or -1 if not found
+ * @param {Array} buffer - data in buffer
+ * @returns index of first detection byte or -1 if not found
  */
 function findMagic(buffer)
 {
@@ -308,9 +301,7 @@ function findMagic(buffer)
 
 /**
  * Process received data.
- *
- * @param {Uint8Array} data incoming data as uint8 values
- * @returns null
+ * @param {Uint8Array} data - incoming data as uint8 values
  */
 function processReceivedData(data)
 {
@@ -319,17 +310,17 @@ function processReceivedData(data)
   while (true) {
     if (rxBuffer.length < usbHeaderSize) return;  // header won't fit
 
-    // find magic bytes from the buffer
+    // find detection bytes from the buffer
     let magicIndex = findMagic(rxBuffer);
-    if (magicIndex === -1) {  // no magic match, keep last 4 bytes
+    if (magicIndex === -1) {  // no detection, keep last 4 bytes
       rxBuffer = rxBuffer.slice(-4);
       return;
     }
-    // if magic bytes are not the first in the array discard bytes til magic
+    // if detection bytes are not the first in the array discard bytes til magic
     if (magicIndex > 0) {
       rxBuffer = rxBuffer.slice(magicIndex);
     }
-    // magic is the first in the buffer, but header is incomplete
+    // detection bytes first in the buffer, but header is incomplete
     if (rxBuffer.length < usbHeaderSize) return;
 
     // parse header
@@ -388,7 +379,6 @@ function processReceivedData(data)
 
 /**
  * Divide raw ADC values into two channels.
- * 
  * @param {Uint8Array} frameBuf
  */
 function divideDataIntoChannels(frameBuf)
@@ -470,7 +460,6 @@ window.addEventListener('DOMContentLoaded', () => {
   updateScopeScales();
 });
 
-
 /**
  * Toggle scope display update.
  */
@@ -485,9 +474,8 @@ function toggleDisplayUpdate()
 
 /**
  * Draw the oscilloscope background grid.
- *
- * @param {*} width
- * @param {*} height
+ * @param {Number} width - canvas width
+ * @param {Number} height - canvas height
  */
 function drawGrid(width, height)
 {
@@ -533,10 +521,10 @@ function drawGrid(width, height)
 }
 
 /**
- * Draw trigger level line (scaled to CH1).
+ * Draw trigger level line and scale it to CH1.
  *
- * @param {*} width
- * @param {*} height
+ * @param {Number} width - canvas width
+ * @param {Number} height - canvas height
  */
 function drawTrigger(width, height)
 {
@@ -560,9 +548,8 @@ function drawTrigger(width, height)
 
 /**
  * Plot full scope frame.
- *
- * @param {Uint8Array} ch1 readings from ADC1
- * @param {Uint8Array} ch2 readings from ADC1
+ * @param {Uint8Array} ch1 - readings from ADC1
+ * @param {Uint8Array} ch2 - readings from ADC1
  * @returns null
  */
 function plotFrame(ch1, ch2) {
@@ -574,7 +561,6 @@ function plotFrame(ch1, ch2) {
   // background grid and trigger line
   ctx.drawImage(gridCanvas, 0, 0);
   drawTrigger(width, height);
-  //drawTrigger(ctx, padding, width, height);
 
   // time scaling (ms)
   const visibleSamples = Math.min(samplesPerScreen, ch1.length);  // in case not enough data
@@ -620,10 +606,10 @@ function plotFrame(ch1, ch2) {
 /* MEASUREMENTS -------------------------------------------------------------------------------- */
 /**
  * Calculate RMS from array using adcTomV conversion.
- * @param {Uint8Array} values
- * @param {Number} len
- * @param {Number} offset
- * @param {Number} mvPerADCCount
+ * @param {Uint8Array} values - measurement data
+ * @param {Number} len - length of values
+ * @param {Number} offset - 0V offset
+ * @param {Number} mvPerADCCount - mV per number in ADC result
  * @returns RMS of array relative to offset
  */
 function calcRMS(values, len, offset, mvPerADCCount)
@@ -638,9 +624,9 @@ function calcRMS(values, len, offset, mvPerADCCount)
 
 /**
  * Estimate signal frequency.
- * @param {Uint8Array} values
- * @param {Number} zeroLine
- * @param {Number} sampleRate
+ * @param {Uint8Array} values - measurement data
+ * @param {Number} zeroLine - 0V line
+ * @param {Number} sampleRate - sample rate
  * @returns estimated frequency
  */
 function estimateFrequency(values, zeroLine, sampleRate) {
@@ -652,16 +638,14 @@ function estimateFrequency(values, zeroLine, sampleRate) {
       crossings++;
     }
   }
-  // frequency = (crossings/2) / total time
-  const totalTime = values.length / sampleRate;
-  return (crossings/2) / totalTime;
+  return (crossings*sampleRate) / (2 * (values.length -1))
 }
 
 /**
  * Calculate phase shift between 2 signals.
  * @param {Uint8Array} signalA - first signal
  * @param {Uint8Array} signalB - second signal
- * @param {Number} frequency - signal frequency
+ * @param {Number} frequency - estimated signal frequency
  * @param {Number} sampleRate - sample rate
  * @returns {Number} - phase shift in degrees
  */
@@ -672,12 +656,11 @@ function calculatePhaseShift(signalA, signalB, frequency, sampleRate) {
   let meanA = 0;
   let meanB = 0;
 
-  // search for best match by shifting signal B (lag), while
-  // limiting search to one period
+  // search for best match by shifting signal B (lag), while limiting search to one period
   const periodInSamples = Math.floor(sampleRate / frequency);
   const searchRange = Math.min(n, periodInSamples);
 
-  // remove DC offset
+  // calculate DC offset
   for (let i=0; i<n; i++) {
     meanA += signalA[i];
     meanB += signalB[i];
@@ -699,17 +682,14 @@ function calculatePhaseShift(signalA, signalB, frequency, sampleRate) {
       sampleDelay = lag;
     }
   }
-
-  // calculate time delay and phaseshift
-  const phaseShiftDegrees = (sampleDelay / periodInSamples) * 360;
-
-  return phaseShiftDegrees * -1;
+  // calculate phaseshift
+  return (sampleDelay/periodInSamples) * -360;
 }
 
 /**
  * Measurement data text updater.
- * @param {Text} elementId
- * @param {Text} text
+ * @param {Text} elementId - where to write
+ * @param {Text} text - text to write
  */
 function updateText(elementId, text)
 {
@@ -719,8 +699,11 @@ function updateText(elementId, text)
 
 /**
  * Update measurement values.
- * @param {Uint8Array} rms1
- * @param {Uint8Array} rms2
+ * @param {Number} rms1 - ch1 rms
+ * @param {Number} rms2 - ch2 rms
+ * @param {Number} freq1 - ch1 frequency
+ * @param {Number} freq2 - ch2 frequency
+ * @param {Number} phase - phase shift
  */
 function measurementUpdate(rms1, rms2, freq1, freq2, phase)
 {
@@ -735,9 +718,9 @@ function measurementUpdate(rms1, rms2, freq1, freq2, phase)
     else return freq.toFixed(2) + " Hz"
   }
   const formatPhase = (phase) => {
-    if (!Number.isFinite(phase)) return "- °";
-    if (phase>=10) return (phase/1000).toFixed(1) + " °";
-    else return phase.toFixed(2) + " °"
+    if (!Number.isFinite(phase)) return "-°";
+    if (phase>=100) return phase.toFixed(1) + "°";
+    else return phase.toFixed(2) + "°"
   }
   updateText('ch1-rms', formatRMS(rms1));
   updateText('ch2-rms', formatRMS(rms2));
@@ -748,8 +731,8 @@ function measurementUpdate(rms1, rms2, freq1, freq2, phase)
 
 /**
  * Wrapper for scope measurements.
- * @param {Uint8Array} valuesCh1 
- * @param {Uint8Array} valuesCh2 
+ * @param {Uint8Array} valuesCh1 - ch1 measurements
+ * @param {Uint8Array} valuesCh2 - ch2 measurements
  */
 function scopeMeasurements(valuesCh1, valuesCh2)
 {
@@ -776,7 +759,6 @@ function toggleTheme()
   document.body.classList.toggle('light', isLightTheme);  // TODO: ADD THEMES IN CSS & TOGGLE IN HTML
   document.getElementById('themeIcon').textContent  = isLightTheme ? '☀️' : '🌙';
   document.getElementById('themeLabel').textContent = isLightTheme ? 'Light' : 'Dark';
-  try {localStorage.setItem('ISCscope-theme', isLightTheme ? 'light' : 'dark');} catch(e) {}
   // refresh colors immediately
   drawGrid(canvas.width, canvas.height);
   updateStatus(isConnected);
